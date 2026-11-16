@@ -47,6 +47,7 @@ class Regle:
         return naissance, survie
 
     def _nombre_de_voisines(self, caractere):
+        """Convertit un chiffre de la notation en entier (0 à 8)."""
         if caractere not in "012345678":
             raise ValueError(f"{caractere!r} n'est pas un nombre de voisines (0 à 8)")
         return int(caractere)

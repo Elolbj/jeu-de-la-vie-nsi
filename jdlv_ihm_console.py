@@ -23,6 +23,7 @@ class Jdlv_IHM_Console:
         self.nb_tours_max = nb_tours_max
 
     def effacer_ecran(self):
+        """Efface le terminal (commande cls sous Windows, clear sinon)."""
         os.system("cls" if os.name == "nt" else "clear")
 
     def afficher(self):

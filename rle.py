@@ -124,6 +124,7 @@ def ecrire_rle(motif, regle="B3/S23", nom=None):
     sequences = []
 
     def ajouter(symbole):
+        """Ajoute un symbole à la fin de sequences, en regroupant les répétitions."""
         if sequences and sequences[-1][1] == symbole:
             sequences[-1][0] += 1          # même symbole : on augmente le compte
         else:

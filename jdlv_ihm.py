@@ -93,6 +93,7 @@ class Jdlv_IHM:
     # Construction de l'interface
     # ------------------------------------------------------------------
     def _creer_menu(self):
+        """Crée la barre de menus (Fichier, Aide)."""
         barre = tk.Menu(self.fenetre)
         menu_fichier = tk.Menu(barre, tearoff=False)
         menu_fichier.add_command(label="Ouvrir un motif (.rle)...", accelerator="Ctrl+O",
@@ -137,6 +138,9 @@ class Jdlv_IHM:
                                 height=HAUTEUR_COURBE, bg=COULEUR_FOND,
                                 highlightthickness=0)
         self.courbe.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="n")
+        # Si le panneau de droite est plus haut que le tableau, l'espace en trop
+        # va sous la courbe (et pas entre le tableau et la courbe).
+        self.fenetre.rowconfigure(1, weight=1)
 
     def _bouton(self, parent, texte, commande):
         """Crée un bouton qui ne prend pas le focus : sinon la touche Espace
@@ -232,24 +236,29 @@ class Jdlv_IHM:
         return isinstance(evenement.widget, (tk.Entry, ttk.Entry))
 
     def _raccourci_lecture(self, evenement):
+        """Touche Espace : démarrer / pause."""
         if not self._saisie_en_cours(evenement):
             self.basculer_lecture()
 
     def _raccourci_etape(self, evenement):
+        """Touche Entrée : tour suivant."""
         if not self._saisie_en_cours(evenement):
             self.etape()
 
     def _raccourci_retour(self, evenement):
+        """Touche Retour arrière : tour précédent."""
         if not self._saisie_en_cours(evenement):
             self.retour_arriere()
 
     def afficher_aide(self):
+        """Ouvre une fenêtre qui résume les commandes et les règles."""
         messagebox.showinfo("Aide", AIDE)
 
     # ------------------------------------------------------------------
     # Affichage
     # ------------------------------------------------------------------
     def couleur_cellule(self, cellule):
+        """Renvoie la couleur à utiliser pour dessiner une cellule."""
         if not cellule.est_vivante():
             return COULEUR_FOND
         if self.afficher_age.get():
@@ -316,11 +325,13 @@ class Jdlv_IHM:
             self.demarrer()
 
     def demarrer(self):
+        """Lance l'animation."""
         self.en_cours = True
         self.bouton_lecture.config(text="Pause")
         self._boucle()
 
     def arreter(self):
+        """Met l'animation en pause et annule le prochain tour programmé."""
         self.en_cours = False
         self.bouton_lecture.config(text="Démarrer")
         if self.id_minuteur is not None:
@@ -345,15 +356,18 @@ class Jdlv_IHM:
     # Actions sur le tableau
     # ------------------------------------------------------------------
     def remplir_aleatoirement(self):
+        """Bouton « Remplissage aléatoire » : 25 % de cellules vivantes."""
         self.jeu.remplir_aleatoirement(0.25)
         self.dessiner()
 
     def effacer(self):
+        """Bouton « Tout effacer » : vide le tableau et revient au tour 0."""
         self.arreter()
         self.jeu.vider()
         self.dessiner()
 
     def changer_torique(self):
+        """Case « Bords reliés » : active ou désactive le tore."""
         self.jeu.changer_torique(self.torique.get())
 
     def _nom_regle(self, notation):
@@ -418,6 +432,7 @@ class Jdlv_IHM:
         self.dessiner()
 
     def placer_motif_au_centre(self):
+        """Bouton « Placer au centre » : place le motif choisi au milieu."""
         self.placer_motif(self.jeu.largeur // 2, self.jeu.hauteur // 2)
 
     # ------------------------------------------------------------------
@@ -437,15 +452,18 @@ class Jdlv_IHM:
             self._peindre(x, y)
 
     def glisser(self, evenement):
+        """Souris déplacée bouton enfoncé : continue de dessiner (ou d'effacer)."""
         x, y = self._case_sous_souris(evenement)
         if self.jeu.est_dans_grille(x, y):
             self._peindre(x, y)
 
     def _peindre(self, x, y):
+        """Rend la case (x, y) vivante ou morte selon le mode de dessin."""
         self.jeu.modifier_cellule(x, y, self.mode_dessin)
         self.dessiner()
 
     def placer_motif_a_la_souris(self, evenement):
+        """Maj + clic : place le motif choisi sous la souris."""
         x, y = self._case_sous_souris(evenement)
         if self.jeu.est_dans_grille(x, y):
             self.placer_motif(x, y)

@@ -250,6 +250,7 @@ class Jdlv:
         return bytes(cellule.Etat for cellule in self.cellules())
 
     def _memoriser_etat_actuel(self):
+        """Garde une photo de l'état actuel (retour arrière) et sa signature (cycles)."""
         # Photo pour le retour arrière : l'âge suffit (âge 0 = cellule morte).
         # Un octet ne dépasse pas 255, d'où le min().
         self.historique.append(bytes(min(c.age, 255) for c in self.cellules()))

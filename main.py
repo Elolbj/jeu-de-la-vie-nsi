@@ -13,6 +13,7 @@ from motifs import MOTIFS
 
 
 def main():
+    """Crée le jeu de départ et le lance en mode graphique ou console."""
     if "--console" in sys.argv:
         jeu = Jdlv(40, 20, torique=True)
         jeu.remplir_aleatoirement(0.3)
