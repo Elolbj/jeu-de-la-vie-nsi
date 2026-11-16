@@ -32,7 +32,11 @@ class Jdlv:
     """
 
     TAILLE_HISTORIQUE = 500     # nombre de tours que l'on peut annuler
-    TAILLE_MEMOIRE = 2000       # nombre d'états retenus pour détecter les cycles
+    # Nombre d'états retenus pour détecter les cycles. Un cycle plus long n'est
+    # pas détecté. Exemple : sur un tore de 70 x 45, un planeur seul revient à
+    # sa position de départ après 4 x ppcm(70, 45) = 2520 tours.
+    # Chaque état occupe largeur x hauteur octets (3 150 octets pour 70 x 45).
+    TAILLE_MEMOIRE = 3000
 
     def __init__(self, largeur=70, hauteur=50, torique=True, regle="B3/S23"):
         assert largeur >= 3 and hauteur >= 3, "le tableau doit faire au moins 3x3"

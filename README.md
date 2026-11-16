@@ -184,7 +184,10 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
   nombre fini d'états possibles, donc la simulation finit toujours par repasser
   par un état déjà vu. On range chaque état dans un dictionnaire
   `signature → tour` : quand un état revient, la période est la différence
-  des deux tours.
+  des deux tours. Limite : on ne garde que 3 000 états. Or, sur un tore de
+  70 × 45, un planeur seul ne revient à son point de départ qu'après
+  4 × ppcm(70, 45) = 2 520 tours. Avec 2 000 états, ce cycle passait inaperçu ;
+  il est maintenant détecté.
 - **Raccourcis clavier.** La touche Espace actionnait aussi le bouton qui avait
   le focus, et la saisie d'une règle déclenchait les raccourcis. Solution : les
   boutons ne prennent pas le focus, et les raccourcis sont ignorés pendant une
