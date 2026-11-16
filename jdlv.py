@@ -189,6 +189,23 @@ class Jdlv:
                           (self.hauteur - hauteur) // 2)
         self._remettre_a_zero()
 
+    def redimensionner(self, largeur, hauteur):
+        """Renvoie un nouveau jeu de largeur x hauteur cases qui contient les
+        cellules vivantes de celui-ci, centrées (celles qui dépassent d'un
+        tableau plus petit sont perdues). Le nouveau jeu repart du tour 0."""
+        nouveau = Jdlv(largeur, hauteur, self.torique, str(self.regle))
+        dx = (largeur - self.largeur) // 2
+        dy = (hauteur - self.hauteur) // 2
+        for y in range(self.hauteur):
+            for x in range(self.largeur):
+                ancienne = self.grille[y][x]
+                if ancienne.est_vivante() and nouveau.est_dans_grille(x + dx, y + dy):
+                    cellule = nouveau.grille[y + dy][x + dx]
+                    cellule.naitre()
+                    cellule.age = ancienne.age
+        nouveau._remettre_a_zero()
+        return nouveau
+
     def motif_actuel(self):
         """Renvoie les cellules vivantes sous forme de motif (liste de chaînes),
         réduit au plus petit rectangle qui les contient ([] si tout est mort)."""

@@ -160,6 +160,18 @@ def test_planeur_devient_un_bloc_contre_un_bord():
     assert jeu.statut == STABLE and jeu.population() == 4
 
 
+def test_redimensionner_garde_les_cellules_au_centre():
+    jeu = jeu_avec(MOTIFS["Pulsar"], 1, 1, largeur=15, hauteur=15)
+    jeu.tour_suivant()
+    grand = jeu.redimensionner(300, 200)
+    assert (grand.largeur, grand.hauteur, grand.tour) == (300, 200, 0)
+    assert grand.motif_actuel() == jeu.motif_actuel()        # même dessin
+    assert grand.population() == jeu.population()
+    assert grand.regle.notation == jeu.regle.notation
+    petit = grand.redimensionner(5, 5)                       # on ne garde que le milieu
+    assert petit.population() < jeu.population()
+
+
 # ----------------------------------------------------------------------
 # 4. Motifs connus
 # ----------------------------------------------------------------------

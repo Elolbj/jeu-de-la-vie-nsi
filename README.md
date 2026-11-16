@@ -26,13 +26,19 @@ le paquet `python3-tk`).
 python main.py
 ```
 
+Avec un tableau plus grand (largeur puis hauteur, jusqu'à 880 × 560) :
+
+```bash
+python main.py 220 140
+```
+
 Affichage dans le terminal (efface l'écran à chaque tour) :
 
 ```bash
 python main.py --console
 ```
 
-Lancer les tests (26 tests) :
+Lancer les tests (27 tests) :
 
 ```bash
 python test_jeu_de_la_vie.py
@@ -49,7 +55,10 @@ navigateur, sur ordinateur ou sur téléphone, sans rien installer. Tkinter ne
 fonctionne pas sur un téléphone, donc les classes Python y sont traduites en
 JavaScript, avec les mêmes noms : `Cellule.Etat`, `Jdlv.grille`, `Jdlv.tour`,
 `tour_suivant()`, `Jdlv_IHM`... On y dessine au doigt, et on y retrouve les
-règles, les motifs, la détection des cycles et les fichiers RLE.
+règles, les motifs, la détection des cycles et les fichiers RLE. Le damier va de
+200 × 200 à 3 000 × 3 000 cases, avec zoom à deux doigts : pour tenir 9 millions
+de cases sur un téléphone, les `Etat` y sont rangés dans un tableau d'octets
+(`Uint8Array`) au lieu d'un objet `Cellule` par case.
 
 Depuis un programme, on crée un jeu en instanciant `Jdlv` puis on le lance avec `start()` :
 
@@ -87,6 +96,7 @@ jeu.start()                             # ou : jeu.start("console")
 | **Détection automatique** : extinction, stable, cycle de période *p* | affichée dans « Statistiques », pause automatique (désactivable) |
 | **Courbe de population** | sous le tableau |
 | Bords reliés (tore) ou tableau fermé | case « Bords reliés (tore) » |
+| **Taille du tableau réglable**, de 40 × 26 à 440 × 280 (« Immense ») ou au choix | cadre « Tableau » : liste ou largeur × hauteur puis « Appliquer » ; les cellules vivantes sont gardées au centre |
 | **Import / export RLE**, le format des passionnés (LifeWiki, Golly) | menu Fichier, **Ctrl+O** / **Ctrl+S** ; exemples dans `motifs_rle/` |
 | Affichage console | `python main.py --console` |
 
@@ -161,14 +171,14 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
 
 ## Les tests
 
-`test_jeu_de_la_vie.py` contient 26 tests, regroupés par thème :
+`test_jeu_de_la_vie.py` contient 27 tests, regroupés par thème :
 
 | Thème | Ce qui est vérifié |
 |---|---|
 | Conformité au sujet | `Etat` entier, `grille` liste de listes de `Cellule`, `tour` à 0, `start()` |
 | Entrées invalides | état 2, tableau trop petit, densité 1,5, règle `B9/S23`, fichier RLE abîmé |
 | Règles | les 18 cas (morte/vivante × 0 à 8 voisines), HighLife, Seeds, âge des cellules |
-| Voisinage et bords | 3 voisines dans un coin, 5 sur un bord, 8 au milieu ou sur un tore |
+| Voisinage, bords et taille | 3 voisines dans un coin, 5 sur un bord, 8 au milieu ou sur un tore ; agrandir ou réduire le tableau garde le dessin au centre |
 | Motifs connus | bloc stable, clignotant (période 2), planeur (1 case en diagonale en 4 tours), vaisseau léger (2 cases en 4 tours), pulsar (48 cellules, période 3), pentadécathlon (période 15), canon de Gosper (+1 planeur tous les 30 tours), diehard (disparaît au tour 130) |
 | Implémentation de référence | sur des tableaux aléatoires, le résultat est comparé, tour après tour, à un calcul indépendant écrit autrement |
 | Historique et cycles | retour arrière sur 30 tours, détection extinction / stable / cycle |
@@ -188,7 +198,13 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
   réagir aux clics. On utilise `fenetre.after(délai, fonction)`, qui rappelle la
   fonction plus tard et rend la main à Tkinter entre deux tours.
 - **Rapidité de l'affichage.** On crée les 3 150 rectangles une seule fois, puis
-  on ne recolore que les cases qui ont changé.
+  on ne recolore que les cases qui ont changé. Pour les grands tableaux (cases de
+  moins de 5 pixels), des dizaines de milliers de rectangles ralentissent
+  Tkinter : on dessine alors une seule image (`PhotoImage`, un pixel par case),
+  agrandie avec `zoom()`. Le calcul reste celui des objets `Cellule` : environ
+  0,2 s par tour pour 440 × 280 = 123 200 cases. C'est la limite d'une cellule
+  objet en Python ; la version web, avec un tableau d'octets, calcule 2 000 × 2 000
+  cases en environ 50 ms.
 - **Détecter qu'il ne se passe plus rien.** Le tableau est fini : il n'a qu'un
   nombre fini d'états possibles, donc la simulation finit toujours par repasser
   par un état déjà vu. On range chaque état dans un dictionnaire

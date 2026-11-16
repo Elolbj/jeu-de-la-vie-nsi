@@ -27,6 +27,25 @@ COULEUR_VIVANTE = "#a6e3a1"   # cellule vivante (quand on n'affiche pas l'âge)
 COULEUR_COURBE = "#89b4fa"    # courbe de population
 HAUTEUR_COURBE = 80           # hauteur du graphique, en pixels
 
+# Place maximale occupée par le tableau à l'écran, en pixels
+ZONE_LARGEUR = 880
+ZONE_HAUTEUR = 560
+# En dessous de cette taille de case, on dessine une image (PhotoImage) au lieu
+# d'un rectangle par case : Tkinter rame au-delà de quelques dizaines de
+# milliers de rectangles.
+TAILLE_MIN_RECTANGLES = 5
+
+# Tailles proposées : texte affiché -> (largeur, hauteur)
+TAILLES = {
+    "Petit · 40 × 26": (40, 26),
+    "Normal · 70 × 45": (70, 45),
+    "Grand · 120 × 80": (120, 80),
+    "Très grand · 220 × 140": (220, 140),
+    "Immense · 440 × 280": (440, 280),
+}
+LARGEUR_MAX = 880
+HAUTEUR_MAX = 560
+
 # Couleur d'une cellule vivante selon son âge : (âge maximum, couleur)
 COULEURS_AGE = [
     (1, "#f9e2af"),    # vient de naître : jaune
@@ -61,6 +80,11 @@ Couleurs
   Jaune = cellule qui vient de naître ... mauve = vivante depuis 20 tours ou plus"""
 
 
+def taille_case_pour(largeur, hauteur):
+    """Côté d'une case (en pixels) pour que le tableau tienne dans la zone."""
+    return max(1, min(12, ZONE_LARGEUR // largeur, ZONE_HAUTEUR // hauteur))
+
+
 def couleur_selon_age(age):
     """Renvoie la couleur d'une cellule vivante d'âge donné."""
     for age_max, couleur in COULEURS_AGE:
@@ -71,9 +95,10 @@ def couleur_selon_age(age):
 class Jdlv_IHM:
     """Interface graphique (Tkinter + Canvas) qui affiche et anime un Jdlv."""
 
-    def __init__(self, jeu, taille_cellule=12):
+    def __init__(self, jeu, taille_cellule=None):
         self.jeu = jeu
-        self.taille = taille_cellule  # côté d'une case, en pixels
+        # côté d'une case, en pixels (calculé selon la taille du tableau si absent)
+        self.taille = taille_cellule or taille_case_pour(jeu.largeur, jeu.hauteur)
         self.en_cours = False         # True quand l'animation tourne
         self.id_minuteur = None       # identifiant renvoyé par after()
         self.mode_dessin = True       # True : on dessine, False : on efface
@@ -109,12 +134,22 @@ class Jdlv_IHM:
         self.fenetre.config(menu=barre)
 
     def _creer_canevas(self):
-        """Crée la zone de dessin et un rectangle par cellule."""
+        """Crée la zone de dessin.
+
+        Grandes cases : un rectangle par cellule. Petites cases (tableau
+        immense) : une image d'un pixel par cellule, agrandie avec zoom().
+        """
         largeur_px = self.jeu.largeur * self.taille
         hauteur_px = self.jeu.hauteur * self.taille
         self.canevas = tk.Canvas(self.fenetre, width=largeur_px, height=hauteur_px,
                                  bg=COULEUR_FOND, highlightthickness=0)
         self.canevas.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+        self.mode_image = self.taille < TAILLE_MIN_RECTANGLES
+        if self.mode_image:
+            self.image = tk.PhotoImage(width=self.jeu.largeur, height=self.jeu.hauteur)
+            self.image_affichee = self.image
+            self.id_image = self.canevas.create_image(0, 0, anchor="nw", image=self.image)
+            return
 
         # On crée les rectangles une seule fois ; ensuite on ne fera que
         # changer leur couleur, ce qui est beaucoup plus rapide.
@@ -139,8 +174,8 @@ class Jdlv_IHM:
                                 highlightthickness=0)
         self.courbe.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="n")
         # Si le panneau de droite est plus haut que le tableau, l'espace en trop
-        # va sous la courbe (et pas entre le tableau et la courbe).
-        self.fenetre.rowconfigure(1, weight=1)
+        # va tout en bas (et pas entre le tableau, la courbe et les statistiques).
+        self.fenetre.rowconfigure(3, weight=1)
 
     def _bouton(self, parent, texte, commande):
         """Crée un bouton qui ne prend pas le focus : sinon la touche Espace
@@ -152,7 +187,7 @@ class Jdlv_IHM:
     def _creer_panneau(self):
         """Crée le panneau de commandes à droite du tableau."""
         panneau = ttk.Frame(self.fenetre, padding=(0, 10, 10, 10))
-        panneau.grid(row=0, column=1, rowspan=2, sticky="n")
+        panneau.grid(row=0, column=1, rowspan=4, sticky="n")
 
         # --- Animation ---
         cadre = ttk.LabelFrame(panneau, text="Animation", padding=8)
@@ -167,6 +202,24 @@ class Jdlv_IHM:
         # --- Tableau ---
         cadre = ttk.LabelFrame(panneau, text="Tableau", padding=8)
         cadre.pack(fill="x", pady=(0, 8))
+        self.taille_choisie = tk.StringVar(value=self._nom_taille())
+        liste_tailles = ttk.Combobox(cadre, textvariable=self.taille_choisie,
+                                     values=list(TAILLES.keys()), state="readonly")
+        liste_tailles.pack(fill="x", pady=2)
+        liste_tailles.bind("<<ComboboxSelected>>", self.choisir_taille)
+        ligne = ttk.Frame(cadre)
+        ligne.pack(fill="x", pady=2)
+        self.largeur_voulue = tk.IntVar(value=self.jeu.largeur)
+        self.hauteur_voulue = tk.IntVar(value=self.jeu.hauteur)
+        ttk.Spinbox(ligne, from_=3, to=LARGEUR_MAX, width=5,
+                    textvariable=self.largeur_voulue).pack(side="left")
+        ttk.Label(ligne, text=" × ").pack(side="left")
+        ttk.Spinbox(ligne, from_=3, to=HAUTEUR_MAX, width=5,
+                    textvariable=self.hauteur_voulue).pack(side="left")
+        ttk.Button(ligne, text="Appliquer", command=self.appliquer_taille,
+                   takefocus=False).pack(side="right")
+        self.texte_taille = tk.StringVar()
+        ttk.Label(cadre, textvariable=self.texte_taille, foreground="#666666").pack(anchor="w")
         self._bouton(cadre, "Remplissage aléatoire", self.remplir_aleatoirement)
         self._bouton(cadre, "Tout effacer", self.effacer)
         self.torique = tk.BooleanVar(value=self.jeu.torique)
@@ -205,30 +258,34 @@ class Jdlv_IHM:
         liste.bind("<<ComboboxSelected>>", lambda evenement: self.fenetre.focus_set())
         self._bouton(cadre, "Placer au centre", self.placer_motif_au_centre)
 
-        # --- Statistiques ---
-        cadre = ttk.LabelFrame(panneau, text="Statistiques", padding=8)
-        cadre.pack(fill="x")
+        # --- Statistiques : une ligne sous la courbe ---
+        cadre = ttk.Frame(self.fenetre, padding=(10, 0, 10, 10))
+        cadre.grid(row=2, column=0, sticky="ew")
         self.texte_tour = tk.StringVar()
         self.texte_population = tk.StringVar()
         self.texte_statut = tk.StringVar()
-        ttk.Label(cadre, textvariable=self.texte_tour).pack(anchor="w")
-        ttk.Label(cadre, textvariable=self.texte_population).pack(anchor="w")
+        ttk.Label(cadre, textvariable=self.texte_tour, width=14).pack(side="left")
+        ttk.Label(cadre, textvariable=self.texte_population, width=20).pack(side="left")
         self.etiquette_statut = ttk.Label(cadre, textvariable=self.texte_statut)
-        self.etiquette_statut.pack(anchor="w")
+        self.etiquette_statut.pack(side="left")
         self.pause_auto = tk.BooleanVar(value=True)
         ttk.Checkbutton(cadre, text="Pause si stable ou cycle", variable=self.pause_auto,
-                        takefocus=False).pack(anchor="w", pady=(4, 0))
+                        takefocus=False).pack(side="right")
 
     def _associer_evenements(self):
         """Relie la souris et le clavier aux actions."""
-        self.canevas.bind("<Button-1>", self.clic)
-        self.canevas.bind("<B1-Motion>", self.glisser)
-        self.canevas.bind("<Shift-Button-1>", self.placer_motif_a_la_souris)
+        self._associer_souris()
         self.fenetre.bind("<space>", self._raccourci_lecture)
         self.fenetre.bind("<Return>", self._raccourci_etape)
         self.fenetre.bind("<BackSpace>", self._raccourci_retour)
         self.fenetre.bind("<Control-o>", lambda evenement: self.ouvrir_rle())
         self.fenetre.bind("<Control-s>", lambda evenement: self.enregistrer_rle())
+
+    def _associer_souris(self):
+        """Relie les clics sur le tableau aux actions (à refaire si le canevas change)."""
+        self.canevas.bind("<Button-1>", self.clic)
+        self.canevas.bind("<B1-Motion>", self.glisser)
+        self.canevas.bind("<Shift-Button-1>", self.placer_motif_a_la_souris)
 
     def _saisie_en_cours(self, evenement):
         """True si l'utilisateur est en train de taper dans une zone de texte :
@@ -270,6 +327,23 @@ class Jdlv_IHM:
 
         Seules les cases dont la couleur a changé sont redessinées.
         """
+        if self.mode_image:
+            self._dessiner_image()
+        else:
+            self._dessiner_rectangles()
+
+        nb_cases = f"{self.jeu.largeur * self.jeu.hauteur:,}".replace(",", " ")
+        self.texte_taille.set(f"{self.jeu.largeur} × {self.jeu.hauteur} = {nb_cases} cases "
+                              f"de {self.taille} px")
+        self.texte_tour.set(f"Tour : {self.jeu.tour}")
+        self.texte_population.set(f"Population : {self.jeu.population()}")
+        self.texte_statut.set(self.jeu.description_statut())
+        couleur = "black" if self.jeu.statut == EN_EVOLUTION else "#d20f39"
+        self.etiquette_statut.config(foreground=couleur)
+        self.dessiner_courbe()
+
+    def _dessiner_rectangles(self):
+        """Recolore les rectangles des cases qui ont changé."""
         for y in range(self.jeu.hauteur):
             for x in range(self.jeu.largeur):
                 couleur = self.couleur_cellule(self.jeu.get_cellule(x, y))
@@ -277,12 +351,20 @@ class Jdlv_IHM:
                     self.canevas.itemconfig(self.rectangles[y][x], fill=couleur)
                     self.couleurs_affichees[y][x] = couleur
 
-        self.texte_tour.set(f"Tour : {self.jeu.tour}")
-        self.texte_population.set(f"Population : {self.jeu.population()}")
-        self.texte_statut.set(self.jeu.description_statut())
-        couleur = "black" if self.jeu.statut == EN_EVOLUTION else "#d20f39"
-        self.etiquette_statut.config(foreground=couleur)
-        self.dessiner_courbe()
+    def _dessiner_image(self):
+        """Redessine toute l'image : un pixel par case, puis agrandissement.
+
+        PhotoImage.put() reçoit une ligne de couleurs par rangée du tableau,
+        sous la forme "{#rrggbb #rrggbb ...} {...}".
+        """
+        rangees = []
+        for ligne in self.jeu.grille:
+            couleurs = [self.couleur_cellule(cellule) for cellule in ligne]
+            rangees.append("{" + " ".join(couleurs) + "}")
+        self.image.put(" ".join(rangees))
+        if self.taille > 1:
+            self.image_affichee = self.image.zoom(self.taille)
+            self.canevas.itemconfig(self.id_image, image=self.image_affichee)
 
     def dessiner_courbe(self):
         """Trace la population des derniers tours (un point tous les 2 pixels)."""
@@ -364,6 +446,47 @@ class Jdlv_IHM:
         """Bouton « Tout effacer » : vide le tableau et revient au tour 0."""
         self.arreter()
         self.jeu.vider()
+        self.dessiner()
+
+    def _nom_taille(self):
+        """Nom de la taille actuelle dans la liste TAILLES (ou texte vide)."""
+        for nom, dimensions in TAILLES.items():
+            if dimensions == (self.jeu.largeur, self.jeu.hauteur):
+                return nom
+        return ""
+
+    def choisir_taille(self, evenement=None):
+        """Liste « Taille » : applique la taille choisie."""
+        largeur, hauteur = TAILLES[self.taille_choisie.get()]
+        self.largeur_voulue.set(largeur)
+        self.hauteur_voulue.set(hauteur)
+        self.fenetre.focus_set()
+        self.appliquer_taille()
+
+    def appliquer_taille(self):
+        """Change la taille du tableau en gardant les cellules vivantes (centrées)."""
+        try:
+            largeur = int(self.largeur_voulue.get())
+            hauteur = int(self.hauteur_voulue.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Taille invalide", "Largeur et hauteur doivent être des nombres entiers.")
+            return
+        if not (3 <= largeur <= LARGEUR_MAX and 3 <= hauteur <= HAUTEUR_MAX):
+            messagebox.showerror("Taille invalide",
+                                 f"Largeur entre 3 et {LARGEUR_MAX}, hauteur entre 3 et {HAUTEUR_MAX}.")
+            return
+        self.arreter()
+        self.fenetre.config(cursor="watch")
+        self.fenetre.update_idletasks()
+        self.jeu = self.jeu.redimensionner(largeur, hauteur)
+        self.taille = taille_case_pour(largeur, hauteur)
+        self.canevas.destroy()
+        self.courbe.destroy()
+        self._creer_canevas()
+        self._creer_courbe()
+        self._associer_souris()
+        self.taille_choisie.set(self._nom_taille())
+        self.fenetre.config(cursor="")
         self.dessiner()
 
     def changer_torique(self):
