@@ -1,6 +1,6 @@
 ---
 name: verifier-projet-jdlv
-description: Vérifie le projet « Jeu de la vie » de Terminale NSI (classes Cellule, Jdlv, Jdlv_IHM) avant de le rendre ou après une modification - exigences du sujet (attribut Etat entier, tableau 2D grille, attribut tour, méthode start, classe Jdlv_IHM), tests, docstrings, animation Tkinter sans boucle while, capture d'écran de la fenêtre, cohérence du README. À utiliser dès que l'on modifie ce projet, ou quand l'utilisateur demande si son jeu de la vie est « bon », « conforme au sujet », « prêt à rendre », veut lancer les tests ou prépare l'oral, même s'il ne dit pas « vérifier ».
+description: Vérifie le projet « Jeu de la vie » de Terminale NSI (classes Cellule, Jdlv, Jdlv_IHM) avant de le rendre ou après une modification - exigences du sujet (attribut Etat entier, tableau 2D grille, attribut tour, méthode start, classe Jdlv_IHM), tests, docstrings, animation Tkinter sans boucle while, capture d'écran de la fenêtre, version web pour téléphone (moteur JavaScript comparé à un calcul de référence, damier géant, affichage mobile), cohérence du README. À utiliser dès que l'on modifie ce projet (code Python ou page web), qu'on change la taille du damier, ou quand l'utilisateur demande si son jeu de la vie est « bon », « conforme au sujet », « prêt à rendre », « marche sur téléphone », veut lancer les tests ou prépare l'oral, même s'il ne dit pas « vérifier ».
 ---
 
 # Vérifier le projet Jeu de la vie (Terminale NSI)
@@ -43,7 +43,26 @@ sert à attraper ce genre d'écart avant le rendu.
    (chemin du script relatif au dossier de cette skill). Ouvrir l'image et
    vérifier que rien n'est coupé et que la courbe et les statistiques s'affichent.
 
-4. **Vérifier le README** : le nombre de tests annoncé, le tableau
+4. **Si la version web (`web/jeu_de_la_vie.html`) a changé**, la tester :
+
+   ```bash
+   node .claude/skills/verifier-projet-jdlv/scripts/tester_web.js . [capture.png]
+   ```
+
+   Le script compare le moteur JavaScript, tour après tour, à un calcul de
+   référence indépendant (tore et bords fermés), vérifie le diehard (éteint au
+   tour 130) et le pentadécathlon (période 15), chronomètre un damier de
+   2 000 × 2 000 cases, puis, si Playwright est installé, ouvre la page sur un
+   iPhone simulé : pas d'erreur JavaScript, pas de défilement horizontal,
+   animation qui avance. Une version web qui « a l'air de marcher » peut
+   calculer faux sur les bords : c'est la comparaison avec la référence qui
+   le montre.
+
+   La page web n'utilise pas d'objet `Cellule` par case (trop lourd pour des
+   millions de cases sur un téléphone) : c'est voulu, ne pas « corriger ». Le
+   rendu noté est le code Python.
+
+5. **Vérifier le README** : le nombre de tests annoncé, le tableau
    « Ce que demande le sujet » et la liste des fonctionnalités doivent
    correspondre au code.
 
