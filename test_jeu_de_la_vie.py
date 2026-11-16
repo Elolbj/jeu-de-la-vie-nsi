@@ -12,9 +12,11 @@ Les tests sont regroupés par thème :
   6. historique et détection des cycles
   7. format de fichier RLE
   8. affichage console
+  9. exemples des docstrings (doctests)
 Les nombres attendus (périodes, tour 130 du diehard...) viennent de LifeWiki.
 """
 
+import doctest
 import io
 import random
 from contextlib import redirect_stdout
@@ -355,6 +357,19 @@ def test_affichage_console():
     assert "■ ■ ■" in texte                     # le clignotant horizontal est affiché
     assert "Tour 2" in texte and "Cycle de période 2" in texte   # arrêt automatique
     assert jeu.tour == 2
+
+
+# ----------------------------------------------------------------------
+# 9. Doctests : les exemples écrits dans les docstrings sont exacts
+# ----------------------------------------------------------------------
+def test_exemples_des_docstrings():
+    import cellule
+    import motifs
+    import regle
+    import rle
+    for module in (cellule, motifs, regle, rle):
+        echecs, nb_exemples = doctest.testmod(module)
+        assert nb_exemples > 0 and echecs == 0, module.__name__
 
 
 if __name__ == "__main__":

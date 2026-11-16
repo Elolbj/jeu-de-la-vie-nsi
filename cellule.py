@@ -59,6 +59,12 @@ class Cellule:
         """Compte les voisines vivantes.
 
         Comme Etat vaut 0 ou 1, il suffit d'additionner les états des voisines.
+
+        >>> c = Cellule()
+        >>> for etat in [1, 1, 0, 1]:
+        ...     c.ajouter_voisine(Cellule(etat))
+        >>> c.nombre_voisines_vivantes()
+        3
         """
         total = 0
         for voisine in self.voisines:

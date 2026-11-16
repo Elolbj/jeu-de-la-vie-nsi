@@ -78,7 +78,11 @@ MOTIFS = {
 
 
 def coordonnees_motif(motif):
-    """Renvoie la liste des positions (dx, dy) des cellules vivantes du motif."""
+    """Renvoie la liste des positions (dx, dy) des cellules vivantes du motif.
+
+    >>> coordonnees_motif([".O", "O."])
+    [(1, 0), (0, 1)]
+    """
     positions = []
     for dy, ligne in enumerate(motif):
         for dx, caractere in enumerate(ligne):

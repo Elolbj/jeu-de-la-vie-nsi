@@ -32,7 +32,7 @@ Affichage dans le terminal (efface l'écran à chaque tour) :
 python main.py --console
 ```
 
-Lancer les tests (25 tests) :
+Lancer les tests (26 tests) :
 
 ```bash
 python test_jeu_de_la_vie.py
@@ -153,7 +153,7 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
 
 ## Les tests
 
-`test_jeu_de_la_vie.py` contient 25 tests, regroupés par thème :
+`test_jeu_de_la_vie.py` contient 26 tests, regroupés par thème :
 
 | Thème | Ce qui est vérifié |
 |---|---|
@@ -166,6 +166,7 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
 | Historique et cycles | retour arrière sur 30 tours, détection extinction / stable / cycle |
 | Format RLE | le canon de Gosper publié sur LifeWiki est identique à notre motif ; aller-retour écriture → lecture |
 | Affichage console | le motif est affiché et la simulation s'arrête d'elle-même |
+| Doctests | les exemples `>>>` des docstrings (`Regle`, `Cellule`, `rle`, `motifs`) donnent bien le résultat annoncé |
 
 ## Difficultés rencontrées (et solutions)
 

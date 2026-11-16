@@ -81,7 +81,11 @@ def convertir_regle(texte):
 
 
 def _decoder(donnees):
-    """Transforme 'bob$2bo$3o!' en ['.O', '..O', 'OOO']."""
+    """Transforme le texte RLE du motif en liste de chaînes.
+
+    >>> _decoder("bob$2bo$3o!")
+    ['.O.', '..O', 'OOO']
+    """
     motif = []
     ligne = ""
     nombre = ""                    # chiffres lus avant un symbole

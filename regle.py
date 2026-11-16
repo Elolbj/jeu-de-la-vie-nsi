@@ -53,7 +53,16 @@ class Regle:
         return int(caractere)
 
     def etat_suivant(self, etat, nb_voisines_vivantes):
-        """Renvoie l'état (0 ou 1) d'une cellule au tour suivant."""
+        """Renvoie l'état (0 ou 1) d'une cellule au tour suivant.
+
+        >>> conway = Regle("B3/S23")
+        >>> conway.etat_suivant(0, 3)   # morte avec 3 voisines : naissance
+        1
+        >>> conway.etat_suivant(1, 4)   # vivante avec 4 voisines : surpopulation
+        0
+        >>> Regle("B36/S23").etat_suivant(0, 6)   # HighLife : naissance avec 6
+        1
+        """
         if etat == 1:
             return 1 if nb_voisines_vivantes in self.survie else 0
         return 1 if nb_voisines_vivantes in self.naissance else 0
