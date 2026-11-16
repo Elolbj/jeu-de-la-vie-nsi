@@ -265,6 +265,21 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
     </section>
 
     <section class="section">
+      <h3>Appareil</h3>
+      <p class="aide" id="materiel-info">Détection du matériel…</p>
+      <div class="ligne">
+        <label for="profil">Profil</label>
+        <select id="profil" aria-label="Profil de performance">
+          <option value="auto" selected>Automatique</option>
+          <option value="economie">Économie (batterie, petit téléphone)</option>
+          <option value="equilibre">Équilibré</option>
+          <option value="performance">Performance</option>
+        </select>
+      </div>
+      <p class="aide" id="profil-info"></p>
+    </section>
+
+    <section class="section">
       <h3>Animation</h3>
       <div class="ligne">
         <label for="vitesse">Vitesse</label>
@@ -330,7 +345,7 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
    ===================================================================== */
 const MORTE = 0;
 const VIVANTE = 1;
-const MAX_CASES = 9000000;   // 3 000 × 3 000 : au-delà, trop lourd pour un téléphone
+const MAX_CASES = 9000000;   // 3 000 × 3 000 : limite absolue, quel que soit l'appareil
 
 // ---------------------------------------------------------------- regle.py
 const REGLES = {
@@ -400,6 +415,7 @@ const EN_EVOLUTION = "en évolution", EXTINCTION = "extinction", STABLE = "stabl
 
 class Jdlv {
   static TAILLE_MEMOIRE = 3000;
+  static BUDGET_HISTORIQUE = 48e6;   // octets pour le retour arrière (réglé selon l'appareil)
 
   constructor(largeur = 200, hauteur = 200, torique = true, regle = "B3/S23") {
     if (!(largeur >= 3 && hauteur >= 3)) throw new Error("le damier doit faire au moins 3 × 3");
@@ -415,8 +431,13 @@ class Jdlv {
     this._suivant = new Uint8Array(taille);       // tampon du tour suivant (calcul en 2 étapes)
     this.ages = new Uint8Array(n);                // tours consécutifs en vie (max 255)
     this._population = 0;
-    // Historique limité à ~48 Mo : 500 tours pour 200×200, 12 pour 2 000×2 000
-    this.taille_historique = Math.max(10, Math.min(500, Math.floor(48e6 / n)));
+    // Historique limité par la mémoire : avec 48 Mo, 500 tours pour 200×200, 12 pour 2 000×2 000
+    this.taille_historique = Math.max(5, Math.min(500, Math.floor(Jdlv.BUDGET_HISTORIQUE / n)));
+    // Lignes qui ont changé au dernier tour : une ligne dont aucune voisine n'a
+    // bougé ne peut pas changer, on ne la recalcule pas (« ligne calme »).
+    this._lignes_changees = new Uint8Array(hauteur);
+    this._lignes_changees_suivant = new Uint8Array(hauteur);
+    this._tout_recalculer = true;
     this.historique = [];
     this.populations = [0];
     this.deja_vus = new Map();
@@ -445,6 +466,7 @@ class Jdlv {
     this._apres_modification();
   }
   _apres_modification() {
+    this._tout_recalculer = true;
     this.deja_vus = new Map();
     this.statut = EN_EVOLUTION;
     this.periode = null;
@@ -539,24 +561,42 @@ class Jdlv {
     this._memoriser_etat_actuel();
     const W = this.largeur, H = this.hauteur, e = this.grille, s = this._suivant, a = this.ages;
     const nais = this.regle._table_naissance, surv = this.regle._table_survie;
+    const avant = this._lignes_changees, apres = this._lignes_changees_suivant;
+    const tout = this._tout_recalculer;
+    apres.fill(0);
     let pop = 0;
     for (let y = 1; y < H - 1; y++) {
-      let i = y * W + 1;
-      const fin = y * W + W - 1;
+      const debut = y * W;
+      if (!tout && !avant[y - 1] && !avant[y] && !avant[y + 1]) {
+        // Ligne calme : rien n'a bougé autour, on recopie l'état et on vieillit les vivantes
+        s.set(e.subarray(debut, debut + W), debut);
+        for (let i = debut + 1; i < debut + W - 1; i++) {
+          if (e[i]) { pop++; if (a[i] < 255) a[i]++; }
+        }
+        continue;
+      }
+      let i = debut + 1;
+      const fin = debut + W - 1;
       let gauche = e[i - 1 - W] + e[i - 1] + e[i - 1 + W];
       let milieu = e[i - W] + e[i] + e[i + W];
+      let change = 0;
       for (; i < fin; i++) {
         const droite = e[i + 1 - W] + e[i + 1] + e[i + 1 + W];
         const vivante = e[i];
         const v = vivante ? surv[gauche + milieu + droite - 1] : nais[gauche + milieu + droite];
         s[i] = v;
         pop += v;
+        change |= v ^ vivante;
         a[i] = v ? (a[i] < 255 ? a[i] + 1 : 255) : 0;
         gauche = milieu;
         milieu = droite;
       }
+      apres[y] = change;
     }
-    pop += this._calculer_bords(e, s, a, nais, surv);
+    pop += this._calculer_bords(e, s, a, nais, surv, apres);
+    this._lignes_changees = apres;
+    this._lignes_changees_suivant = avant;
+    this._tout_recalculer = false;
     this.grille = s;
     this._suivant = e;
     this._population = pop;
@@ -566,7 +606,7 @@ class Jdlv {
     if (this.populations.length > 20000) this.populations.splice(0, 10000);
     this._analyser();
   }
-  _calculer_bords(e, s, a, nais, surv) {
+  _calculer_bords(e, s, a, nais, surv, lignes_changees) {
     const W = this.largeur, H = this.hauteur, tore = this.torique;
     let pop = 0;
     const traiter = (x, y) => {
@@ -583,6 +623,7 @@ class Jdlv {
       const i = y * W + x;
       const v = e[i] ? surv[n] : nais[n];
       s[i] = v;
+      if (v !== e[i]) lignes_changees[y] = 1;
       a[i] = v ? (a[i] < 255 ? a[i] + 1 : 255) : 0;
       pop += v;
     };
@@ -638,7 +679,7 @@ class Jdlv {
     if (this.statut === CYCLE) return `Cycle de période ${this.periode}`;
     return "En évolution";
   }
-  start() { const ihm = new Jdlv_IHM(this); ihm.lancer(); return ihm; }
+  start(materiel = null) { const ihm = new Jdlv_IHM(this, materiel); ihm.lancer(); return ihm; }
 }
 
 // ------------------------------------------------------------------ rle.py
@@ -708,6 +749,98 @@ function ecrire_rle(motif, regle = "B3/S23", nom = null) {
 }
 
 // ------------------------------------------------------------- jdlv_ihm.py
+
+// ------------------------------------------------------------- materiel.py
+/* Profils de performance. Le profil automatique est choisi d'après le
+   matériel détecté et une mesure de vitesse faite au lancement. */
+const PROFILS = {
+  economie: { nom: "Économie", max_cases: 1000000, budget_historique: 16e6, vitesse_max: 30, ratio_max: 1.5, depart_max: 200 },
+  equilibre: { nom: "Équilibré", max_cases: 4000000, budget_historique: 48e6, vitesse_max: 60, ratio_max: 2, depart_max: 300 },
+  performance: { nom: "Performance", max_cases: MAX_CASES, budget_historique: 128e6, vitesse_max: 240, ratio_max: 3, depart_max: 500 },
+};
+const fr = (n) => Math.round(n).toLocaleString("fr-FR");
+
+class Materiel {
+  constructor() {
+    this.coeurs = navigator.hardwareConcurrency || null;     // cœurs du processeur
+    this.memoire_go = navigator.deviceMemory || null;        // Chrome, Edge, Android (absent sur iPhone)
+    this.ratio_ecran = window.devicePixelRatio || 1;          // pixels réels par pixel CSS
+    this.ecran = [screen.width, screen.height];
+    this.tactile = matchMedia("(pointer: coarse)").matches;
+    this.systeme = Materiel.systeme(navigator.userAgent || "");
+    this.batterie = null;                                     // { niveau, en_charge } si disponible
+    this.cases_par_ms = null;
+  }
+  static systeme(ua) {
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iOS";
+    if (/Android/.test(ua)) return "Android";
+    if (/CrOS/.test(ua)) return "ChromeOS";
+    if (/Windows/.test(ua)) return "Windows";
+    if (/Mac OS X|Macintosh/.test(ua)) return "macOS";
+    if (/Linux/.test(ua)) return "Linux";
+    return "Système inconnu";
+  }
+  /** Fait tourner un damier de 400 × 400 au hasard et mesure les cases calculées par milliseconde. */
+  mesurer_vitesse() {
+    const jeu = new Jdlv(400, 400, true);
+    jeu.remplir_aleatoirement(0.3);
+    jeu.tour_suivant();                       // échauffement : le navigateur compile le code
+    let tours = 0, duree = 0;
+    const debut = performance.now();
+    while (tours < 3 || (duree < 60 && tours < 12)) {
+      jeu.tour_suivant();
+      tours++;
+      duree = performance.now() - debut;
+    }
+    this.cases_par_ms = (400 * 400 * tours) / Math.max(duree, 0.1);
+    return this.cases_par_ms;
+  }
+  async lire_batterie() {
+    try {
+      if (navigator.getBattery) {
+        const b = await navigator.getBattery();
+        this.batterie = { niveau: b.level, en_charge: b.charging };
+      }
+    } catch { /* refusé ou absent (Safari) */ }
+    return this.batterie;
+  }
+  profil_automatique() {
+    const vitesse = this.cases_par_ms || 20000;
+    if (this.batterie && !this.batterie.en_charge && this.batterie.niveau < 0.2) return "economie";
+    if ((this.memoire_go !== null && this.memoire_go <= 2) || vitesse < 15000) return "economie";
+    if (vitesse >= 50000 && (this.memoire_go === null || this.memoire_go >= 4) && (this.coeurs || 4) >= 4) return "performance";
+    return "equilibre";
+  }
+  /** Tours par seconde estimés en début de partie (dessin ≈ autant que le calcul). */
+  tours_par_seconde(nb_cases) { return ((this.cases_par_ms || 20000) * 1000) / (nb_cases * 2); }
+  tours_par_seconde_texte(nb_cases) {
+    const t = this.tours_par_seconde(nb_cases);
+    return t >= 10 ? fr(t) : t.toFixed(1).replace(".", ",");
+  }
+  reglages(profil) {
+    const base = PROFILS[profil];
+    let max_cases = base.max_cases;
+    // au moins ~3 tours par seconde au début, et selon la mémoire quand on la connaît
+    max_cases = Math.min(max_cases, Math.max(250000, ((this.cases_par_ms || 20000) * 1000) / 6));
+    if (this.memoire_go) max_cases = Math.min(max_cases, this.memoire_go * 1.2e6);
+    max_cases = Math.max(250000, Math.floor(max_cases));
+    let cote = 200;
+    for (const c of [200, 500, 1000]) {
+      if (c <= base.depart_max && c * c <= max_cases && this.tours_par_seconde(c * c) >= 30) cote = c;
+    }
+    return { profil, max_cases, budget_historique: base.budget_historique, vitesse_max: base.vitesse_max,
+             ratio_max: base.ratio_max, taille_depart: [cote, cote] };
+  }
+  description() {
+    const parties = [this.systeme];
+    if (this.coeurs) parties.push(`${this.coeurs} cœurs`);
+    parties.push(this.memoire_go ? `${this.memoire_go} Go de mémoire` : "mémoire non communiquée par le navigateur");
+    parties.push(`écran ${this.ecran[0]} × ${this.ecran[1]} (×${String(+this.ratio_ecran.toFixed(2)).replace(".", ",")})`);
+    parties.push(this.tactile ? "tactile" : "souris");
+    if (this.batterie) parties.push(`batterie ${Math.round(this.batterie.niveau * 100)} %${this.batterie.en_charge ? " en charge" : ""}`);
+    return `${parties.join(" · ")}. Vitesse mesurée : ${fr(this.cases_par_ms || 0)} cases calculées par milliseconde.`;
+  }
+}
 const COULEUR_HORS = "#11111b";
 const COULEUR_FOND = "#1e1e2e";
 const COULEUR_LIGNES = "#2a2a3c";
@@ -731,11 +864,15 @@ for (let age = 0; age < 256; age++) {
 }
 
 class Jdlv_IHM {
-  constructor(jeu) {
+  constructor(jeu, materiel = null) {
     this.jeu = jeu;
     this.$ = (id) => document.getElementById(id);
+    this.materiel = materiel || new Materiel();
+    this.reglages = this.materiel.reglages(this.materiel.profil_automatique());
+    this.ratio = 1;                     // pixels réels par pixel CSS (netteté), selon le profil
     this.en_cours = false;
-    this.id_minuteur = null;
+    this.id_image = null;               // identifiant renvoyé par requestAnimationFrame
+    this._reserve = 0;                  // tours « dus » à l'animation
     this.outil = "dessin";              // "dessin", "deplacement" ou "motif"
     this.zoom = 4;                      // taille d'une case, en pixels
     this.ox = 0;                        // position à l'écran du coin haut-gauche du damier
@@ -797,6 +934,7 @@ class Jdlv_IHM {
     clic("mode-motif-fin", () => this.choisir_outil("dessin"));
     this.$("motif").addEventListener("change", () => this._texte_mode_motif());
     this.$("vitesse").addEventListener("input", (e) => { this.$("vitesse-valeur").textContent = `${e.target.value} t/s`; });
+    this.$("profil").addEventListener("change", () => this._appliquer_profil(true));
     this.$("torique").addEventListener("change", (e) => { this.jeu.changer_torique(e.target.checked); this.dessiner(); });
     this.$("couleur-age").addEventListener("change", () => this.dessiner());
     clic("b-rle-charger", () => this.charger_rle(this.$("rle").value));
@@ -833,8 +971,8 @@ class Jdlv_IHM {
         this.message("Largeur et hauteur : entre 10 et 4 000.", true); return;
       }
     } else [largeur, hauteur] = choix.split("x").map(Number);
-    if (largeur * hauteur > MAX_CASES) {
-      this.message(`${(largeur * hauteur).toLocaleString("fr-FR")} cases : c'est trop pour un téléphone (maximum 9 millions).`, true);
+    if (largeur * hauteur > this.reglages.max_cases) {
+      this.message(`${fr(largeur * hauteur)} cases : trop lourd pour cet appareil en profil ${PROFILS[this.reglages.profil].nom} (maximum ${fr(this.reglages.max_cases)}).`, true);
       return;
     }
     this.arreter();
@@ -853,8 +991,37 @@ class Jdlv_IHM {
   }
 
   // ------------------------------------------------------- caméra (zoom)
+  /* Applique le profil (automatique ou choisi) : taille maximale du damier,
+     mémoire du retour arrière, vitesse maximale, netteté de l'écran. */
+  _appliquer_profil(choisi = false) {
+    const choix = this.$("profil").value;
+    const profil = choix === "auto" ? this.materiel.profil_automatique() : choix;
+    this.reglages = this.materiel.reglages(profil);
+    Jdlv.BUDGET_HISTORIQUE = this.reglages.budget_historique;
+    const curseur = this.$("vitesse");
+    curseur.max = this.reglages.vitesse_max;
+    if (Number(curseur.value) > this.reglages.vitesse_max) curseur.value = this.reglages.vitesse_max;
+    this.$("vitesse-valeur").textContent = `${curseur.value} t/s`;
+    for (const option of this.$("taille-damier").options) {
+      const m = option.value.match(/^(\d+)x(\d+)$/);
+      if (!m) continue;
+      if (!option.dataset.nom) option.dataset.nom = option.textContent;
+      const n = Number(m[1]) * Number(m[2]);
+      option.disabled = n > this.reglages.max_cases;
+      option.textContent = option.disabled ? `${option.dataset.nom} — trop lourd ici`
+        : `${option.dataset.nom} · ≈${this.materiel.tours_par_seconde_texte(n)} t/s`;
+    }
+    const r = this.reglages;
+    this.$("materiel-info").textContent = this.materiel.description();
+    this.$("profil-info").textContent = `Profil ${PROFILS[profil].nom}${choix === "auto" ? " (choisi automatiquement)" : ""} : `
+      + `damier jusqu'à ${fr(r.max_cases)} cases, retour arrière sur ${r.budget_historique / 1e6} Mo, `
+      + `jusqu'à ${r.vitesse_max} tours/s, netteté ×${String(+Math.min(r.ratio_max, this.materiel.ratio_ecran).toFixed(2)).replace(".", ",")}.`;
+    this._adapter_canevas();
+    if (choisi) this.message(`Profil ${PROFILS[profil].nom}.`);
+  }
+
   _adapter_canevas() {
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = this.ratio = Math.min(window.devicePixelRatio || 1, this.reglages.ratio_max);
     const l = this.canevas.clientWidth, h = this.canevas.clientHeight;
     if (!l || !h) return;
     const premier = !this._taille_vue;
@@ -944,7 +1111,7 @@ class Jdlv_IHM {
     }
     this.image_ctx.putImageData(this.pixels, 0, 0);
     // 2. On agrandit l'image à l'écran selon le zoom
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = this.ratio;
     const [l, h] = this._taille_vue;
     const ctx = this.ctx, z = this.zoom;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -975,7 +1142,7 @@ class Jdlv_IHM {
     this.dessiner_courbe();
   }
   dessiner_courbe() {
-    const c = this.courbe, ratio = window.devicePixelRatio || 1;
+    const c = this.courbe, ratio = this.ratio;
     const l = c.clientWidth, h = c.clientHeight;
     if (!l || !h) return;
     if (c.width !== Math.round(l * ratio)) { c.width = Math.round(l * ratio); c.height = Math.round(h * ratio); }
@@ -1003,25 +1170,42 @@ class Jdlv_IHM {
     this.en_cours = true;
     this.$("texte-lecture").textContent = "Pause";
     this.$("icone-lecture").innerHTML = '<path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/>';
-    this._boucle();
+    this._reserve = 1;                  // premier tour tout de suite
+    this._instant = null;
+    this.id_image = requestAnimationFrame((t) => this._animer(t));
   }
   arreter() {
     this.en_cours = false;
-    clearTimeout(this.id_minuteur);
-    this.id_minuteur = null;
+    cancelAnimationFrame(this.id_image);
+    this.id_image = null;
     this.$("texte-lecture").textContent = "Lecture";
     this.$("icone-lecture").innerHTML = '<path d="M7 4.5v15L19.5 12z"/>';
   }
-  _boucle() {   // comme after() en Tkinter
+  /* Boucle d'animation calée sur le rafraîchissement de l'écran : comme after()
+     en Tkinter, mais c'est le navigateur qui nous rappelle avant chaque image.
+     À grande vitesse, on calcule plusieurs tours par image et on ne dessine
+     qu'une fois ; on arrête de calculer quand l'image a déjà pris 12 ms, pour
+     que l'écran reste fluide sur un appareil lent. */
+  _animer(instant) {
+    if (!this.en_cours) return;
+    if (this._instant !== null) this._reserve += ((instant - this._instant) * Number(this.$("vitesse").value)) / 1000;
+    this._instant = instant;
     const debut = performance.now();
-    this.etape();
-    if (this.$("pause-auto").checked && this.jeu.statut !== EN_EVOLUTION) {
-      this.arreter();
-      this.message(`${this.jeu.description_statut()} au tour ${this.jeu.tour} : animation en pause.`);
-      return;
+    let tours = 0;
+    while (this._reserve >= 1) {
+      this.jeu.tour_suivant();
+      this._reserve -= 1;
+      tours++;
+      if (this.$("pause-auto").checked && this.jeu.statut !== EN_EVOLUTION) {
+        this.dessiner();
+        this.arreter();
+        this.message(`${this.jeu.description_statut()} au tour ${this.jeu.tour} : animation en pause.`);
+        return;
+      }
+      if (performance.now() - debut > 12) { this._reserve = Math.min(this._reserve, 1); break; }
     }
-    const delai = 1000 / Number(this.$("vitesse").value) - (performance.now() - debut);
-    this.id_minuteur = setTimeout(() => this._boucle(), Math.max(0, delai));
+    if (tours) this.dessiner();
+    this.id_image = requestAnimationFrame((t) => this._animer(t));
   }
   retour_arriere() {
     this.arreter();
@@ -1216,7 +1400,10 @@ class Jdlv_IHM {
 
   lancer() {
     this._preparer_image();
-    this._adapter_canevas();
+    this._appliquer_profil();
+    // La batterie se lit plus tard (réponse asynchrone) : en profil automatique,
+    // une batterie faible fait passer en Économie.
+    this.materiel.lire_batterie().then(() => { if (this.$("profil").value === "auto") this._appliquer_profil(); });
     try {
       window.claude?.hot?.snapshot?.(() => ({
         taille: [this.jeu.largeur, this.jeu.hauteur],
@@ -1228,21 +1415,40 @@ class Jdlv_IHM {
 
 // ------------------------------------------------------------------ main.py
 function start(donnees = {}) {
-  const [largeur, hauteur] = Array.isArray(donnees.taille) ? donnees.taille : [200, 200];
+  // 1. On détecte l'appareil et on mesure sa vitesse
+  const materiel = new Materiel();
+  materiel.mesurer_vitesse();
+  const reglages = materiel.reglages(materiel.profil_automatique());
+  Jdlv.BUDGET_HISTORIQUE = reglages.budget_historique;
+  // 2. Damier de départ : plus grand sur un appareil rapide
+  const [largeur, hauteur] = Array.isArray(donnees.taille) ? donnees.taille : reglages.taille_depart;
   const jeu = new Jdlv(largeur, hauteur, true);
   if (donnees.rle) {
     try { const [motif, regle] = lire_rle(donnees.rle); jeu.charger_motif(motif, regle); } catch { /* départ par défaut */ }
   }
   if (jeu.population() === 0) {
-    // Départ : une soupe aléatoire au centre, un canon de Gosper et un gland
-    for (let y = 60; y < 140; y++) for (let x = 60; x < 140; x++) if (Math.random() < 0.35) jeu.modifier_cellule(x, y, true);
+    // Une soupe aléatoire au centre, un canon de Gosper en haut à gauche, un gland en bas à droite
+    const L = jeu.largeur, H = jeu.hauteur;
+    for (let y = Math.floor(H * 0.3); y < Math.floor(H * 0.7); y++) {
+      for (let x = Math.floor(L * 0.3); x < Math.floor(L * 0.7); x++) {
+        if (Math.random() < 0.35) { jeu.grille[y * L + x] = 1; jeu.ages[y * L + x] = 1; }
+      }
+    }
+    jeu._recompter();
     jeu.placer_motif(MOTIFS["Canon de Gosper"], 6, 6);
-    jeu.placer_motif(MOTIFS["Gland (5 206 tours)"], 160, 170);
+    jeu.placer_motif(MOTIFS["Gland (5 206 tours)"], Math.floor(L * 0.8), Math.floor(H * 0.85));
     jeu._remettre_a_zero();
   }
-  const opt = [...document.getElementById("taille-damier").options].find((o) => o.value === `${jeu.largeur}x${jeu.hauteur}`);
-  if (opt) opt.selected = true;
-  jeu.start();
+  const liste = document.getElementById("taille-damier");
+  const option = [...liste.options].find((o) => o.value === `${jeu.largeur}x${jeu.hauteur}`);
+  if (option) option.selected = true;
+  else {
+    liste.value = "perso";
+    document.getElementById("taille-perso").hidden = false;
+    document.getElementById("perso-largeur").value = jeu.largeur;
+    document.getElementById("perso-hauteur").value = jeu.hauteur;
+  }
+  jeu.start(materiel);
 }
 const hot = window.claude?.hot;
 if (hot?.ready) hot.ready(start); else start(hot?.data ?? {});

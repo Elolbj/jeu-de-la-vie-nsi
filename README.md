@@ -56,7 +56,12 @@ navigateur, sur ordinateur ou sur téléphone, sans rien installer. Tkinter ne
 fonctionne pas sur un téléphone, donc les classes Python y sont traduites en
 JavaScript, avec les mêmes noms : `Cellule.Etat`, `Jdlv.grille`, `Jdlv.tour`,
 `tour_suivant()`, `Jdlv_IHM`... On y dessine au doigt, et on y retrouve les
-règles, les motifs, la détection des cycles et les fichiers RLE. Le damier va de
+règles, les motifs, la détection des cycles et les fichiers RLE. Elle détecte
+l'appareil (système, cœurs, mémoire, écran, batterie) et mesure sa vitesse au
+lancement, puis choisit un profil Économie, Équilibré ou Performance : taille
+maximale et taille de départ du damier, mémoire du retour arrière, vitesse
+maximale (jusqu'à 240 tours/s, avec plusieurs tours calculés par image),
+netteté de l'écran. Le profil se change dans Réglages › Appareil. Le damier va de
 200 × 200 à 3 000 × 3 000 cases, avec zoom à deux doigts : pour tenir 9 millions
 de cases sur un téléphone, les `Etat` y sont rangés dans un tableau d'octets
 (`Uint8Array`) au lieu d'un objet `Cellule` par case.
