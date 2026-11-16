@@ -12,7 +12,8 @@ Les tests sont regroupés par thème :
   6. historique et détection des cycles
   7. format de fichier RLE
   8. affichage console
-  9. exemples des docstrings (doctests)
+  9. détection du matériel
+ 10. exemples des docstrings (doctests)
 Les nombres attendus (périodes, tour 130 du diehard...) viennent de LifeWiki.
 """
 
@@ -276,6 +277,31 @@ def test_comparaison_avec_une_implementation_de_reference():
             assert cases_vivantes(jeu) == attendu
 
 
+def test_optimisation_cellules_actives_longue_partie():
+    """Sur une longue partie, avec une modification au milieu, le calcul
+    optimisé (seules les cellules actives sont recalculées) donne toujours le
+    même résultat que la référence, et les âges restent justes."""
+    random.seed(7)
+    jeu = Jdlv(40, 30, torique=True)
+    jeu.remplir_aleatoirement(0.3)
+    attendu = cases_vivantes(jeu)
+    for tour in range(1, 251):
+        if tour == 120:                      # le joueur dessine en pleine partie
+            jeu.modifier_cellule(5, 5, True)
+            jeu.modifier_cellule(6, 5, True)
+            jeu.modifier_cellule(7, 5, True)
+            attendu = cases_vivantes(jeu)
+        jeu.tour_suivant()
+        attendu = tour_suivant_reference(attendu, 40, 30, True)
+        assert cases_vivantes(jeu) == attendu, tour
+        assert jeu.population() == len(attendu) == jeu.populations[-1]
+    # Un bloc stable vieillit d'un tour à chaque tour, même s'il n'est plus recalculé
+    jeu = jeu_avec(["OO", "OO"], 4, 4)
+    for _ in range(10):
+        jeu.tour_suivant()
+    assert jeu.get_cellule(4, 4).age == 11
+
+
 # ----------------------------------------------------------------------
 # 6. Historique et détection des cycles
 # ----------------------------------------------------------------------
@@ -372,7 +398,26 @@ def test_affichage_console():
 
 
 # ----------------------------------------------------------------------
-# 9. Doctests : les exemples écrits dans les docstrings sont exacts
+# 9. Matériel
+# ----------------------------------------------------------------------
+def test_detection_du_materiel():
+    from materiel import ECONOME, EQUILIBRE, PUISSANT, Materiel
+    materiel = Materiel.detecter()
+    assert materiel.nb_coeurs >= 1
+    assert materiel.cellules_par_seconde > 0
+    assert materiel.profil() in (ECONOME, EQUILIBRE, PUISSANT)
+    materiel.definir_ecran(1366, 768)                 # petit écran portable
+    largeur_zone, hauteur_zone = materiel.zone_affichage()
+    assert largeur_zone <= 1366 and hauteur_zone <= 768
+    tailles = list(materiel.tailles_proposees().values())
+    assert tailles and tailles == sorted(tailles)      # de la plus petite à la plus grande
+    assert all(l <= largeur_zone and h <= hauteur_zone for l, h in tailles)
+    assert 16e6 <= materiel.budget_historique() <= 256e6
+    assert "Profil" in materiel.description()
+
+
+# ----------------------------------------------------------------------
+# 10. Doctests : les exemples écrits dans les docstrings sont exacts
 # ----------------------------------------------------------------------
 def test_exemples_des_docstrings():
     import cellule

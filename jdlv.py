@@ -11,10 +11,17 @@ le lance avec la méthode start() :
 """
 
 import random
+from array import array
+from operator import attrgetter
 
 from cellule import Cellule
 from motifs import coordonnees_motif, dimensions_motif
 from regle import Regle
+
+# attrgetter("Etat")(cellule) vaut cellule.Etat. Avec map(), Python parcourt
+# toutes les cellules en C, bien plus vite qu'une boucle for.
+ETAT = attrgetter("Etat")
+AGE = attrgetter("age")
 
 # Valeurs possibles de l'attribut statut
 EN_EVOLUTION = "en évolution"
@@ -31,7 +38,11 @@ class Jdlv:
     Le tableau se comporte alors comme la surface d'un donut (un tore).
     """
 
-    TAILLE_HISTORIQUE = 500     # nombre de tours que l'on peut annuler
+    TAILLE_HISTORIQUE = 500     # nombre maximal de tours que l'on peut annuler
+    # Mémoire réservée à l'historique (en octets). main.py l'adapte à la
+    # mémoire de l'ordinateur (voir materiel.py). Une photo prend 4 octets par
+    # case : pour un très grand tableau, on garde donc moins de tours.
+    BUDGET_HISTORIQUE = 64_000_000
     # Nombre d'états retenus pour détecter les cycles. Un cycle plus long n'est
     # pas détecté. Exemple : sur un tore de 70 x 45, un planeur seul revient à
     # sa position de départ après 4 x ppcm(70, 45) = 2520 tours.
@@ -51,6 +62,12 @@ class Jdlv:
         self._toutes_les_cellules = [c for ligne in self.grille for c in ligne]
         self._relier_voisines()
 
+        nb_cases = largeur * hauteur
+        self.taille_historique = max(20, min(self.TAILLE_HISTORIQUE,
+                                             self.BUDGET_HISTORIQUE // (4 * nb_cases)))
+        self._a_recalculer = None   # cellules à recalculer au prochain tour (None = toutes)
+        self._vivantes = set()      # cellules vivantes (tenu à jour par tour_suivant)
+        self._signature = None      # signature de l'état actuel, calculée une seule fois
         self.historique = []        # photos des tours précédents (retour arrière)
         self.populations = [0]      # population à chaque tour (pour la courbe)
         self.deja_vus = {}          # signature d'un état -> tour où on l'a vu
@@ -106,11 +123,8 @@ class Jdlv:
         return self._toutes_les_cellules
 
     def population(self):
-        """Renvoie le nombre de cellules vivantes."""
-        total = 0
-        for cellule in self.cellules():
-            total += cellule.Etat
-        return total
+        """Renvoie le nombre de cellules vivantes (somme des Etat, qui valent 0 ou 1)."""
+        return sum(map(ETAT, self._toutes_les_cellules))
 
     # ------------------------------------------------------------------
     # Configuration initiale et modifications
@@ -123,10 +137,15 @@ class Jdlv:
         self.deja_vus = {}
         self.statut = EN_EVOLUTION
         self.periode = None
+        self._a_recalculer = None
+        self._signature = None
 
     def _apres_modification(self):
         """À appeler quand le tableau ou la règle change en dehors d'un tour :
-        les états déjà vus ne correspondent plus à la même évolution."""
+        les états déjà vus ne correspondent plus à la même évolution, et il
+        faudra recalculer toutes les cellules au prochain tour."""
+        self._a_recalculer = None
+        self._signature = None
         self.deja_vus = {}
         self.statut = EN_EVOLUTION
         self.periode = None
@@ -233,16 +252,48 @@ class Jdlv:
         leur futur état, ensuite seulement elles l'appliquent. Si on
         modifiait les cellules au fur et à mesure, les voisines déjà mises
         à jour fausseraient le calcul des suivantes.
+
+        Optimisation : l'état futur d'une cellule ne dépend que d'elle et de
+        ses 8 voisines. Si aucune des neuf n'a changé au tour précédent, la
+        cellule ne peut pas changer. On ne recalcule donc que les cellules
+        « actives » : celles qui viennent de changer et leurs voisines. Après
+        quelques centaines de tours, il en reste souvent moins de 20 %.
         """
         self._memoriser_etat_actuel()
+        if self._a_recalculer is None:          # après une modification : toutes
+            a_recalculer = self._toutes_les_cellules
+            immobiles_vivantes = []
+        else:
+            a_recalculer = self._a_recalculer
+            immobiles_vivantes = [c for c in self._vivantes if c not in a_recalculer]
 
-        for cellule in self.cellules():
+        # Étape 1 : calcul des états futurs
+        for cellule in a_recalculer:
             cellule.calculer_etat_suivant(self.regle)
-        for cellule in self.cellules():
+        changees = [c for c in a_recalculer if c.etat_suivant != c.Etat]
+        # Étape 2 : application
+        for cellule in a_recalculer:
             cellule.passer_a_l_etat_suivant()
+        for cellule in immobiles_vivantes:      # vivantes non recalculées : elles vieillissent
+            cellule.age += 1
         self.tour += 1
 
-        self.populations.append(self.population())
+        # Préparation du tour suivant : cellules qui ont changé + leurs voisines
+        actives = set(changees)
+        for cellule in changees:
+            actives.update(cellule.voisines)
+        if self._a_recalculer is None:
+            self._vivantes = {c for c in self._toutes_les_cellules if c.Etat}
+        else:
+            for cellule in changees:
+                if cellule.Etat:
+                    self._vivantes.add(cellule)
+                else:
+                    self._vivantes.discard(cellule)
+        self._a_recalculer = actives
+        self._signature = None
+
+        self.populations.append(len(self._vivantes))
         self._analyser()
 
     def tour_precedent(self):
@@ -250,9 +301,10 @@ class Jdlv:
         if len(self.historique) == 0:
             return False
         photo = self.historique.pop()
-        for cellule, age in zip(self.cellules(), photo):
+        for cellule, age in zip(self._toutes_les_cellules, photo):
             cellule.age = age
             cellule.Etat = 1 if age > 0 else 0
+            cellule.etat_suivant = cellule.Etat
         self.tour -= 1
         if len(self.populations) > 1:
             self.populations.pop()
@@ -266,16 +318,18 @@ class Jdlv:
         """Résume l'état du tableau : une suite d'octets valant 0 ou 1.
 
         Deux tableaux identiques ont la même signature, qu'on peut utiliser
-        comme clé de dictionnaire.
+        comme clé de dictionnaire. Elle n'est calculée qu'une fois par tour.
         """
-        return bytes(cellule.Etat for cellule in self.cellules())
+        if self._signature is None:
+            self._signature = bytes(map(ETAT, self._toutes_les_cellules))
+        return self._signature
 
     def _memoriser_etat_actuel(self):
         """Garde une photo de l'état actuel (retour arrière) et sa signature (cycles)."""
         # Photo pour le retour arrière : l'âge suffit (âge 0 = cellule morte).
-        # Un octet ne dépasse pas 255, d'où le min().
-        self.historique.append(bytes(min(c.age, 255) for c in self.cellules()))
-        if len(self.historique) > self.TAILLE_HISTORIQUE:
+        # array("I") range un entier par case sur 4 octets.
+        self.historique.append(array("I", map(AGE, self._toutes_les_cellules)))
+        if len(self.historique) > self.taille_historique:
             self.historique.pop(0)
 
         # Mémoire pour la détection des cycles

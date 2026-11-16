@@ -16,6 +16,11 @@ CONWAY = Regle("B3/S23")
 class Cellule:
     """Une case du tableau du jeu de la vie."""
 
+    # Liste fixe des attributs : chaque objet prend environ deux fois moins de
+    # mémoire et l'accès aux attributs est plus rapide (utile pour des
+    # centaines de milliers de cellules).
+    __slots__ = ("Etat", "etat_suivant", "age", "voisines")
+
     def __init__(self, etat=MORTE):
         assert etat in (MORTE, VIVANTE), "l'état d'une cellule vaut 0 ou 1"
         self.Etat = etat              # état actuel : 0 (morte) ou 1 (vivante)

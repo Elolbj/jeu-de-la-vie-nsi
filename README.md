@@ -26,7 +26,8 @@ le paquet `python3-tk`).
 python main.py
 ```
 
-Avec un tableau plus grand (largeur puis hauteur, jusqu'à 880 × 560) :
+Au lancement, le programme détecte la machine (voir plus bas) et choisit la
+taille du tableau. Pour imposer une taille (largeur puis hauteur) :
 
 ```bash
 python main.py 220 140
@@ -38,7 +39,7 @@ Affichage dans le terminal (efface l'écran à chaque tour) :
 python main.py --console
 ```
 
-Lancer les tests (27 tests) :
+Lancer les tests (29 tests) :
 
 ```bash
 python test_jeu_de_la_vie.py
@@ -96,7 +97,8 @@ jeu.start()                             # ou : jeu.start("console")
 | **Détection automatique** : extinction, stable, cycle de période *p* | affichée dans « Statistiques », pause automatique (désactivable) |
 | **Courbe de population** | sous le tableau |
 | Bords reliés (tore) ou tableau fermé | case « Bords reliés (tore) » |
-| **Taille du tableau réglable**, de 40 × 26 à 440 × 280 (« Immense ») ou au choix | cadre « Tableau » : liste ou largeur × hauteur puis « Appliquer » ; les cellules vivantes sont gardées au centre |
+| **Taille du tableau réglable** : tailles proposées selon l'écran et la vitesse de la machine (jusqu'à 576 × 334 sur un PC rapide en 1920 × 1080), ou au choix | cadre « Tableau » : liste ou largeur × hauteur puis « Appliquer » ; les cellules vivantes sont gardées au centre |
+| **Adaptation au matériel** | menu Aide › Matériel détecté (voir plus bas) |
 | **Import / export RLE**, le format des passionnés (LifeWiki, Golly) | menu Fichier, **Ctrl+O** / **Ctrl+S** ; exemples dans `motifs_rle/` |
 | Affichage console | `python main.py --console` |
 
@@ -161,6 +163,7 @@ classDiagram
 | `jdlv_ihm_console.py` | classe `Jdlv_IHM_Console` : affichage dans le terminal |
 | `motifs.py` | dictionnaire `MOTIFS` des motifs célèbres |
 | `rle.py` | lecture / écriture des fichiers de motifs `.rle` |
+| `materiel.py` | classe `Materiel` : détecte la machine et en déduit les réglages |
 | `main.py` | programme principal |
 | `web/jeu_de_la_vie.html` | version web jouable au doigt (mêmes classes, traduites en JavaScript) |
 | `test_jeu_de_la_vie.py` | les tests |
@@ -171,7 +174,7 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
 
 ## Les tests
 
-`test_jeu_de_la_vie.py` contient 27 tests, regroupés par thème :
+`test_jeu_de_la_vie.py` contient 29 tests, regroupés par thème :
 
 | Thème | Ce qui est vérifié |
 |---|---|
@@ -180,11 +183,52 @@ l'affichage. Les deux classes d'affichage ont les mêmes méthodes (`afficher` o
 | Règles | les 18 cas (morte/vivante × 0 à 8 voisines), HighLife, Seeds, âge des cellules |
 | Voisinage, bords et taille | 3 voisines dans un coin, 5 sur un bord, 8 au milieu ou sur un tore ; agrandir ou réduire le tableau garde le dessin au centre |
 | Motifs connus | bloc stable, clignotant (période 2), planeur (1 case en diagonale en 4 tours), vaisseau léger (2 cases en 4 tours), pulsar (48 cellules, période 3), pentadécathlon (période 15), canon de Gosper (+1 planeur tous les 30 tours), diehard (disparaît au tour 130) |
-| Implémentation de référence | sur des tableaux aléatoires, le résultat est comparé, tour après tour, à un calcul indépendant écrit autrement |
+| Implémentation de référence | sur des tableaux aléatoires, le résultat est comparé, tour après tour, à un calcul indépendant écrit autrement ; une partie de 250 tours, avec un dessin au milieu, vérifie que l'optimisation des cellules actives ne change rien |
+| Matériel | profil reconnu, tailles proposées qui tiennent dans l'écran, mémoire de l'historique bornée |
 | Historique et cycles | retour arrière sur 30 tours, détection extinction / stable / cycle |
 | Format RLE | le canon de Gosper publié sur LifeWiki est identique à notre motif ; aller-retour écriture → lecture |
 | Affichage console | le motif est affiché et la simulation s'arrête d'elle-même |
 | Doctests | les exemples `>>>` des docstrings (`Regle`, `Cellule`, `rle`, `motifs`) donnent bien le résultat annoncé |
+
+## Adaptation au matériel
+
+Au lancement, la classe `Materiel` (`materiel.py`) regarde :
+
+- le système, le nombre de cœurs du processeur et la mémoire vive ;
+- la taille de l'écran (lue par Tkinter) ;
+- la **vitesse réelle du programme** : elle fait tourner un petit jeu de
+  60 × 60 cases pendant un quart de seconde et compte les cellules calculées par
+  seconde. C'est la mesure la plus fiable, car elle dépend à la fois du
+  processeur et de la version de Python.
+
+Elle en déduit un profil (économe, équilibré, puissant) et des réglages :
+
+| Réglage | Calcul |
+|---|---|
+| Place du tableau à l'écran | environ 60 % de l'écran |
+| Tailles proposées | cases de 12, 7, 4, 2 ou 1 pixels dans cette place, sans celles qui feraient moins de 2 tours par seconde |
+| Vitesse annoncée | cellules par seconde ÷ (cases × (1 + coût du dessin)) ; le dessin coûte environ 8 fois le calcul avec des rectangles et 2,5 fois avec une image |
+| Taille au lancement | cases de 7 px (12 px sur une machine économe) |
+| Mémoire du retour arrière | 2 % de la mémoire vive, entre 16 et 256 Mo |
+| Console | le tableau prend la taille du terminal |
+
+Le résumé s'affiche dans le menu Aide › Matériel détecté.
+
+## Optimisations
+
+- **Ne recalculer que les cellules actives.** L'état futur d'une cellule ne
+  dépend que d'elle et de ses 8 voisines : si aucune des neuf n'a changé, elle
+  ne change pas. À chaque tour, on ne recalcule que les cellules qui viennent
+  de changer et leurs voisines. Après 300 tours d'une soupe aléatoire de
+  220 × 140, seules 4 % des cases changent encore : un tour passe de 20 ms à
+  5 ms.
+- **`__slots__` dans `Cellule`** : chaque objet prend deux fois moins de
+  mémoire et l'accès à ses attributs est plus rapide.
+- **Laisser travailler le C** : `bytes(map(attrgetter("Etat"), cellules))`
+  calcule la signature sans boucle Python, et cette signature n'est calculée
+  qu'une fois par tour (au lieu de deux).
+- **Dessin** : les couleurs sont lues dans des tables avec `map()`, et une
+  ligne du tableau qui n'a pas changé n'est pas redessinée.
 
 ## Difficultés rencontrées (et solutions)
 

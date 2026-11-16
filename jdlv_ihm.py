@@ -9,9 +9,11 @@ régler la vitesse...
 
 import os
 import tkinter as tk
+from itertools import repeat
 from tkinter import filedialog, messagebox, ttk
 
-from jdlv import EN_EVOLUTION
+from jdlv import AGE, EN_EVOLUTION, ETAT
+from materiel import Materiel, milliers
 from motifs import MOTIFS, dimensions_motif
 from regle import REGLES
 from rle import ecrire_fichier_rle, lire_fichier_rle
@@ -27,24 +29,12 @@ COULEUR_VIVANTE = "#a6e3a1"   # cellule vivante (quand on n'affiche pas l'âge)
 COULEUR_COURBE = "#89b4fa"    # courbe de population
 HAUTEUR_COURBE = 80           # hauteur du graphique, en pixels
 
-# Place maximale occupée par le tableau à l'écran, en pixels
-ZONE_LARGEUR = 880
-ZONE_HAUTEUR = 560
 # En dessous de cette taille de case, on dessine une image (PhotoImage) au lieu
 # d'un rectangle par case : Tkinter rame au-delà de quelques dizaines de
 # milliers de rectangles.
 TAILLE_MIN_RECTANGLES = 5
-
-# Tailles proposées : texte affiché -> (largeur, hauteur)
-TAILLES = {
-    "Petit · 40 × 26": (40, 26),
-    "Normal · 70 × 45": (70, 45),
-    "Grand · 120 × 80": (120, 80),
-    "Très grand · 220 × 140": (220, 140),
-    "Immense · 440 × 280": (440, 280),
-}
-LARGEUR_MAX = 880
-HAUTEUR_MAX = 560
+# La place donnée au tableau et les tailles proposées dépendent de l'écran et
+# de la vitesse de la machine : voir materiel.py.
 
 # Couleur d'une cellule vivante selon son âge : (âge maximum, couleur)
 COULEURS_AGE = [
@@ -80,9 +70,10 @@ Couleurs
   Jaune = cellule qui vient de naître ... mauve = vivante depuis 20 tours ou plus"""
 
 
-def taille_case_pour(largeur, hauteur):
+def taille_case_pour(largeur, hauteur, zone):
     """Côté d'une case (en pixels) pour que le tableau tienne dans la zone."""
-    return max(1, min(12, ZONE_LARGEUR // largeur, ZONE_HAUTEUR // hauteur))
+    largeur_zone, hauteur_zone = zone
+    return max(1, min(12, largeur_zone // largeur, hauteur_zone // hauteur))
 
 
 def couleur_selon_age(age):
@@ -92,13 +83,19 @@ def couleur_selon_age(age):
             return couleur
 
 
+# Tables de couleurs calculées une fois pour toutes : âge -> couleur (âge 0 =
+# case morte ; au-delà de 19, COULEUR_AGEE) et Etat -> couleur.
+COULEUR_PAR_AGE = {age: couleur_selon_age(age) for age in range(1, 20)}
+COULEUR_PAR_AGE[0] = COULEUR_FOND
+COULEUR_AGEE = COULEURS_AGE[-1][1]
+COULEUR_PAR_ETAT = [COULEUR_FOND, COULEUR_VIVANTE]
+
+
 class Jdlv_IHM:
     """Interface graphique (Tkinter + Canvas) qui affiche et anime un Jdlv."""
 
     def __init__(self, jeu, taille_cellule=None):
         self.jeu = jeu
-        # côté d'une case, en pixels (calculé selon la taille du tableau si absent)
-        self.taille = taille_cellule or taille_case_pour(jeu.largeur, jeu.hauteur)
         self.en_cours = False         # True quand l'animation tourne
         self.id_minuteur = None       # identifiant renvoyé par after()
         self.mode_dessin = True       # True : on dessine, False : on efface
@@ -106,6 +103,15 @@ class Jdlv_IHM:
         self.fenetre = tk.Tk()
         self.fenetre.title("Jeu de la vie de John Horton Conway")
         self.fenetre.resizable(False, False)
+
+        # Matériel : la place du tableau et les tailles proposées en dépendent
+        self.materiel = Materiel.detecter()
+        self.materiel.definir_ecran(self.fenetre.winfo_screenwidth(),
+                                    self.fenetre.winfo_screenheight())
+        self.zone = self.materiel.zone_affichage()
+        self.tailles = self.materiel.tailles_proposees(self.zone)
+        # côté d'une case, en pixels (calculé selon la taille du tableau si absent)
+        self.taille = taille_cellule or taille_case_pour(jeu.largeur, jeu.hauteur, self.zone)
 
         self._creer_menu()
         self._creer_canevas()
@@ -130,6 +136,7 @@ class Jdlv_IHM:
         barre.add_cascade(label="Fichier", menu=menu_fichier)
         menu_aide = tk.Menu(barre, tearoff=False)
         menu_aide.add_command(label="Commandes et règles", command=self.afficher_aide)
+        menu_aide.add_command(label="Matériel détecté", command=self.afficher_materiel)
         barre.add_cascade(label="Aide", menu=menu_aide)
         self.fenetre.config(menu=barre)
 
@@ -204,17 +211,17 @@ class Jdlv_IHM:
         cadre.pack(fill="x", pady=(0, 8))
         self.taille_choisie = tk.StringVar(value=self._nom_taille())
         liste_tailles = ttk.Combobox(cadre, textvariable=self.taille_choisie,
-                                     values=list(TAILLES.keys()), state="readonly")
+                                     values=list(self.tailles.keys()), state="readonly")
         liste_tailles.pack(fill="x", pady=2)
         liste_tailles.bind("<<ComboboxSelected>>", self.choisir_taille)
         ligne = ttk.Frame(cadre)
         ligne.pack(fill="x", pady=2)
         self.largeur_voulue = tk.IntVar(value=self.jeu.largeur)
         self.hauteur_voulue = tk.IntVar(value=self.jeu.hauteur)
-        ttk.Spinbox(ligne, from_=3, to=LARGEUR_MAX, width=5,
+        ttk.Spinbox(ligne, from_=3, to=self.zone[0], width=5,
                     textvariable=self.largeur_voulue).pack(side="left")
         ttk.Label(ligne, text=" × ").pack(side="left")
-        ttk.Spinbox(ligne, from_=3, to=HAUTEUR_MAX, width=5,
+        ttk.Spinbox(ligne, from_=3, to=self.zone[1], width=5,
                     textvariable=self.hauteur_voulue).pack(side="left")
         ttk.Button(ligne, text="Appliquer", command=self.appliquer_taille,
                    takefocus=False).pack(side="right")
@@ -311,16 +318,22 @@ class Jdlv_IHM:
         """Ouvre une fenêtre qui résume les commandes et les règles."""
         messagebox.showinfo("Aide", AIDE)
 
+    def afficher_materiel(self):
+        """Ouvre une fenêtre qui décrit la machine et les réglages adaptés."""
+        messagebox.showinfo("Matériel détecté", self.materiel.description())
+
     # ------------------------------------------------------------------
     # Affichage
     # ------------------------------------------------------------------
-    def couleur_cellule(self, cellule):
-        """Renvoie la couleur à utiliser pour dessiner une cellule."""
-        if not cellule.est_vivante():
-            return COULEUR_FOND
+    def couleurs_ligne(self, ligne):
+        """Couleurs des cellules d'une ligne du tableau.
+
+        map() avec les tables de couleurs fait tout le travail en C : c'est
+        bien plus rapide qu'un appel de fonction Python par cellule.
+        """
         if self.afficher_age.get():
-            return couleur_selon_age(cellule.age)
-        return COULEUR_VIVANTE
+            return list(map(COULEUR_PAR_AGE.get, map(AGE, ligne), repeat(COULEUR_AGEE)))
+        return list(map(COULEUR_PAR_ETAT.__getitem__, map(ETAT, ligne)))
 
     def dessiner(self):
         """Met à jour l'écran pour qu'il corresponde au tableau.
@@ -332,7 +345,7 @@ class Jdlv_IHM:
         else:
             self._dessiner_rectangles()
 
-        nb_cases = f"{self.jeu.largeur * self.jeu.hauteur:,}".replace(",", " ")
+        nb_cases = milliers(self.jeu.largeur * self.jeu.hauteur)
         self.texte_taille.set(f"{self.jeu.largeur} × {self.jeu.hauteur} = {nb_cases} cases "
                               f"de {self.taille} px")
         self.texte_tour.set(f"Tour : {self.jeu.tour}")
@@ -344,12 +357,15 @@ class Jdlv_IHM:
 
     def _dessiner_rectangles(self):
         """Recolore les rectangles des cases qui ont changé."""
-        for y in range(self.jeu.hauteur):
-            for x in range(self.jeu.largeur):
-                couleur = self.couleur_cellule(self.jeu.get_cellule(x, y))
-                if couleur != self.couleurs_affichees[y][x]:
+        for y, ligne in enumerate(self.jeu.grille):
+            couleurs = self.couleurs_ligne(ligne)
+            affichees = self.couleurs_affichees[y]
+            if couleurs == affichees:
+                continue                     # rien n'a changé sur cette ligne
+            for x, couleur in enumerate(couleurs):
+                if couleur != affichees[x]:
                     self.canevas.itemconfig(self.rectangles[y][x], fill=couleur)
-                    self.couleurs_affichees[y][x] = couleur
+            self.couleurs_affichees[y] = couleurs
 
     def _dessiner_image(self):
         """Redessine toute l'image : un pixel par case, puis agrandissement.
@@ -357,10 +373,7 @@ class Jdlv_IHM:
         PhotoImage.put() reçoit une ligne de couleurs par rangée du tableau,
         sous la forme "{#rrggbb #rrggbb ...} {...}".
         """
-        rangees = []
-        for ligne in self.jeu.grille:
-            couleurs = [self.couleur_cellule(cellule) for cellule in ligne]
-            rangees.append("{" + " ".join(couleurs) + "}")
+        rangees = ["{" + " ".join(self.couleurs_ligne(ligne)) + "}" for ligne in self.jeu.grille]
         self.image.put(" ".join(rangees))
         if self.taille > 1:
             self.image_affichee = self.image.zoom(self.taille)
@@ -450,14 +463,14 @@ class Jdlv_IHM:
 
     def _nom_taille(self):
         """Nom de la taille actuelle dans la liste TAILLES (ou texte vide)."""
-        for nom, dimensions in TAILLES.items():
+        for nom, dimensions in self.tailles.items():
             if dimensions == (self.jeu.largeur, self.jeu.hauteur):
                 return nom
         return ""
 
     def choisir_taille(self, evenement=None):
         """Liste « Taille » : applique la taille choisie."""
-        largeur, hauteur = TAILLES[self.taille_choisie.get()]
+        largeur, hauteur = self.tailles[self.taille_choisie.get()]
         self.largeur_voulue.set(largeur)
         self.hauteur_voulue.set(hauteur)
         self.fenetre.focus_set()
@@ -471,15 +484,22 @@ class Jdlv_IHM:
         except (tk.TclError, ValueError):
             messagebox.showerror("Taille invalide", "Largeur et hauteur doivent être des nombres entiers.")
             return
-        if not (3 <= largeur <= LARGEUR_MAX and 3 <= hauteur <= HAUTEUR_MAX):
+        largeur_max, hauteur_max = self.zone        # au moins un pixel par case
+        if not (3 <= largeur <= largeur_max and 3 <= hauteur <= hauteur_max):
             messagebox.showerror("Taille invalide",
-                                 f"Largeur entre 3 et {LARGEUR_MAX}, hauteur entre 3 et {HAUTEUR_MAX}.")
+                                 f"Largeur entre 3 et {largeur_max}, hauteur entre 3 et {hauteur_max}.")
+            return
+        if largeur * hauteur > self.materiel.nb_cases_max() and not messagebox.askokcancel(
+                "Tableau très grand",
+                f"{milliers(largeur * hauteur)} cases, c'est beaucoup pour cette machine "
+                f"(environ {self.materiel.tours_par_seconde(largeur * hauteur, taille_case_pour(largeur, hauteur, self.zone))} tour(s) par "
+                "seconde au début). Continuer ?"):
             return
         self.arreter()
         self.fenetre.config(cursor="watch")
         self.fenetre.update_idletasks()
         self.jeu = self.jeu.redimensionner(largeur, hauteur)
-        self.taille = taille_case_pour(largeur, hauteur)
+        self.taille = taille_case_pour(largeur, hauteur, self.zone)
         self.canevas.destroy()
         self.courbe.destroy()
         self._creer_canevas()
