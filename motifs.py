@@ -29,6 +29,11 @@ MOTIFS = {
         ".............",
         "..OOO...OOO..",
     ],
+    "Pentadécathlon": [
+        "..O....O..",
+        "OO.OOOO.OO",
+        "..O....O..",
+    ],
     # --- Vaisseaux (motifs qui se déplacent) ------------------------------
     "Planeur": [
         ".O.",
@@ -63,6 +68,11 @@ MOTIFS = {
         ".O.....",
         "...O...",
         "OO..OOO",
+    ],
+    "Diehard": [          # disparaît complètement au tour 130
+        "......O.",
+        "OO......",
+        ".O...OOO",
     ],
 }
 

@@ -7,12 +7,18 @@ cellules à la souris, placer des motifs célèbres, changer de règle,
 régler la vitesse...
 """
 
+import os
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from jdlv import EN_EVOLUTION
 from motifs import MOTIFS, dimensions_motif
 from regle import REGLES
+from rle import ecrire_fichier_rle, lire_fichier_rle
+
+# Dossier proposé par défaut pour ouvrir / enregistrer les motifs
+DOSSIER_MOTIFS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "motifs_rle")
+TYPES_FICHIERS = [("Motifs RLE", "*.rle"), ("Tous les fichiers", "*.*")]
 
 # Couleurs de l'affichage
 COULEUR_FOND = "#1e1e2e"      # cellule morte
@@ -36,6 +42,7 @@ AIDE = """Souris
   Maj + clic : placer le motif choisi
 
 Clavier
+  Ctrl+O / Ctrl+S : ouvrir / enregistrer un motif (format RLE)
   Espace : démarrer / pause
   Entrée : tour suivant
   Retour arrière : tour précédent
@@ -87,6 +94,14 @@ class Jdlv_IHM:
     # ------------------------------------------------------------------
     def _creer_menu(self):
         barre = tk.Menu(self.fenetre)
+        menu_fichier = tk.Menu(barre, tearoff=False)
+        menu_fichier.add_command(label="Ouvrir un motif (.rle)...", accelerator="Ctrl+O",
+                                 command=self.ouvrir_rle)
+        menu_fichier.add_command(label="Enregistrer le tableau (.rle)...",
+                                 accelerator="Ctrl+S", command=self.enregistrer_rle)
+        menu_fichier.add_separator()
+        menu_fichier.add_command(label="Quitter", command=self.fenetre.destroy)
+        barre.add_cascade(label="Fichier", menu=menu_fichier)
         menu_aide = tk.Menu(barre, tearoff=False)
         menu_aide.add_command(label="Commandes et règles", command=self.afficher_aide)
         barre.add_cascade(label="Aide", menu=menu_aide)
@@ -208,6 +223,8 @@ class Jdlv_IHM:
         self.fenetre.bind("<space>", self._raccourci_lecture)
         self.fenetre.bind("<Return>", self._raccourci_etape)
         self.fenetre.bind("<BackSpace>", self._raccourci_retour)
+        self.fenetre.bind("<Control-o>", lambda evenement: self.ouvrir_rle())
+        self.fenetre.bind("<Control-s>", lambda evenement: self.enregistrer_rle())
 
     def _saisie_en_cours(self, evenement):
         """True si l'utilisateur est en train de taper dans une zone de texte :
@@ -356,6 +373,42 @@ class Jdlv_IHM:
         self.texte_regle.set(self._nom_regle(str(self.jeu.regle)))
         self.fenetre.focus_set()
         return "break"  # la touche Entrée ne doit pas aussi faire avancer d'un tour
+
+    def ouvrir_rle(self):
+        """Demande un fichier .rle, puis l'affiche au centre d'un tableau vide."""
+        self.arreter()
+        chemin = filedialog.askopenfilename(title="Ouvrir un motif",
+                                            initialdir=DOSSIER_MOTIFS,
+                                            filetypes=TYPES_FICHIERS)
+        if not chemin:
+            return                                   # l'utilisateur a annulé
+        try:
+            motif, regle = lire_fichier_rle(chemin)
+            self.jeu.charger_motif(motif, regle)
+        except (OSError, ValueError) as erreur:
+            messagebox.showerror("Impossible d'ouvrir ce motif", str(erreur))
+            return
+        self.texte_regle.set(self._nom_regle(str(self.jeu.regle)))
+        self.dessiner()
+
+    def enregistrer_rle(self):
+        """Enregistre les cellules vivantes dans un fichier .rle."""
+        self.arreter()
+        motif = self.jeu.motif_actuel()
+        if not motif:
+            messagebox.showinfo("Rien à enregistrer", "Le tableau est vide.")
+            return
+        chemin = filedialog.asksaveasfilename(title="Enregistrer le motif",
+                                              initialdir=DOSSIER_MOTIFS,
+                                              defaultextension=".rle",
+                                              filetypes=TYPES_FICHIERS)
+        if not chemin:
+            return
+        nom = os.path.splitext(os.path.basename(chemin))[0]
+        try:
+            ecrire_fichier_rle(chemin, motif, str(self.jeu.regle), nom)
+        except OSError as erreur:
+            messagebox.showerror("Impossible d'enregistrer", str(erreur))
 
     def placer_motif(self, x, y):
         """Place le motif choisi centré sur la case (x, y)."""

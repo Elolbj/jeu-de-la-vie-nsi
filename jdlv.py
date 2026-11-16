@@ -13,7 +13,7 @@ le lance avec la méthode start() :
 import random
 
 from cellule import Cellule
-from motifs import coordonnees_motif
+from motifs import coordonnees_motif, dimensions_motif
 from regle import Regle
 
 # Valeurs possibles de l'attribut statut
@@ -166,6 +166,41 @@ class Jdlv:
             if self.est_dans_grille(cx, cy):
                 self.grille[cy][cx].naitre()
         self._apres_modification()
+
+    def charger_motif(self, motif, regle=None):
+        """Vide le tableau, place le motif au centre et repart du tour 0.
+
+        Si regle est donnée (ex. lue dans un fichier RLE), elle remplace la
+        règle actuelle. Lève ValueError si la règle est invalide ou si le
+        motif ne tient pas dans le tableau (rien n'est alors modifié).
+        """
+        nouvelle_regle = Regle(regle) if regle else self.regle
+        largeur, hauteur = dimensions_motif(motif) if motif else (0, 0)
+        if largeur > self.largeur or hauteur > self.hauteur:
+            raise ValueError(f"motif trop grand ({largeur}x{hauteur}) pour un "
+                             f"tableau de {self.largeur}x{self.hauteur}")
+        self.regle = nouvelle_regle
+        self.vider()
+        self.placer_motif(motif, (self.largeur - largeur) // 2,
+                          (self.hauteur - hauteur) // 2)
+        self._remettre_a_zero()
+
+    def motif_actuel(self):
+        """Renvoie les cellules vivantes sous forme de motif (liste de chaînes),
+        réduit au plus petit rectangle qui les contient ([] si tout est mort)."""
+        xs = [x for y in range(self.hauteur) for x in range(self.largeur)
+              if self.grille[y][x].est_vivante()]
+        ys = [y for y in range(self.hauteur) for x in range(self.largeur)
+              if self.grille[y][x].est_vivante()]
+        if not xs:
+            return []
+        motif = []
+        for y in range(min(ys), max(ys) + 1):
+            ligne = ""
+            for x in range(min(xs), max(xs) + 1):
+                ligne += "O" if self.grille[y][x].est_vivante() else "."
+            motif.append(ligne)
+        return motif
 
     # ------------------------------------------------------------------
     # Évolution

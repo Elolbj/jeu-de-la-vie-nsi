@@ -1,0 +1,4 @@
+#N Réplicateur (HighLife)
+#C Se recopie toutes les 12 générations avec la règle B36/S23.
+x = 5, y = 5, rule = B36/S23
+2b3o$bo2bo$o3bo$o2bo$3o!

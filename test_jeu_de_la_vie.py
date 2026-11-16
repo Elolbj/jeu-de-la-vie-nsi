@@ -8,6 +8,7 @@ from cellule import Cellule
 from jdlv import CYCLE, EN_EVOLUTION, EXTINCTION, STABLE, Jdlv
 from motifs import MOTIFS
 from regle import Regle
+from rle import convertir_regle, ecrire_rle, lire_rle
 
 
 def jeu_avec(motif, x, y, largeur=10, hauteur=10, torique=False):
@@ -153,6 +154,64 @@ def test_retour_arriere():
     assert cases_vivantes(jeu) == depart
     assert jeu.tour_precedent() is False     # plus d'historique
     assert jeu.populations == [5]
+
+
+GOSPER_RLE = """#N Gosper glider gun (format publié sur LifeWiki)
+x = 36, y = 9, rule = B3/S23
+24bo$22bobo$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o$2o8bo3bob2o4b
+obo$10bo5bo7bo$11bo3bo$12b2o!"""
+
+
+def test_lecture_rle():
+    motif, regle = lire_rle(GOSPER_RLE)
+    assert motif == MOTIFS["Canon de Gosper"]   # nos données sont justes
+    assert regle == "B3/S23"
+    assert lire_rle("x = 3, y = 2\n3o$o!") == (["OOO", "O.."], None)
+    assert lire_rle("x = 1, y = 3\no2$o!")[0] == ["O", ".", "O"]   # 2$ = ligne vide
+
+
+def test_ecriture_rle_aller_retour():
+    for nom, motif in MOTIFS.items():
+        texte = ecrire_rle(motif, "B3/S23", nom)
+        assert lire_rle(texte) == (motif, "B3/S23"), nom
+        assert all(len(ligne) <= 70 for ligne in texte.splitlines())
+
+
+def test_regles_rle_et_erreurs():
+    assert convertir_regle("23/3") == "B3/S23"          # ancienne notation S/B
+    assert convertir_regle("b36/s23") == "B36/S23"
+    assert convertir_regle("B3/S23:T70,50") == "B3/S23"  # forme du tableau ignorée
+    try:
+        lire_rle("x = 3, y = 3\nbo$2bo%3o!")
+        assert False, "le caractère % aurait dû être refusé"
+    except ValueError:
+        pass
+
+
+def test_charger_et_extraire_un_motif():
+    jeu = Jdlv(20, 20)
+    jeu.charger_motif(MOTIFS["Planeur"], "B36/S23")
+    assert jeu.motif_actuel() == MOTIFS["Planeur"] and str(jeu.regle) == "B36/S23"
+    assert jeu.tour == 0 and jeu.populations == [5]
+    try:
+        jeu.charger_motif(MOTIFS["Canon de Gosper"])   # 36 colonnes > 20
+        assert False, "motif trop grand accepté"
+    except ValueError:
+        assert jeu.motif_actuel() == MOTIFS["Planeur"]   # rien n'a changé
+
+
+def test_pentadecathlon_et_diehard():
+    jeu = Jdlv(30, 20, torique=False)
+    jeu.charger_motif(MOTIFS["Pentadécathlon"])
+    while jeu.statut == EN_EVOLUTION:
+        jeu.tour_suivant()
+    assert jeu.statut == CYCLE and jeu.periode == 15
+
+    jeu = Jdlv(40, 40, torique=False)
+    jeu.charger_motif(MOTIFS["Diehard"])
+    while jeu.statut == EN_EVOLUTION:
+        jeu.tour_suivant()
+    assert jeu.statut == EXTINCTION and jeu.tour == 130
 
 
 if __name__ == "__main__":
