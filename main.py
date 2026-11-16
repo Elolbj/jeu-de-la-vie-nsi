@@ -18,7 +18,7 @@ def main():
         jeu.remplir_aleatoirement(0.3)
         jeu.start("console")
     else:
-        jeu = Jdlv(70, 50, torique=False)
+        jeu = Jdlv(70, 45, torique=False)
         jeu.placer_motif(MOTIFS["Canon de Gosper"], 2, 2)
         jeu.start("tkinter")
 

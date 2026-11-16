@@ -8,6 +8,8 @@ La classe Jdlv_IHM_Console offre les mêmes méthodes que Jdlv_IHM
 import os
 import time
 
+from jdlv import EN_EVOLUTION
+
 
 class Jdlv_IHM_Console:
     """Affiche le jeu dans le terminal, en effaçant l'écran à chaque tour."""
@@ -35,15 +37,21 @@ class Jdlv_IHM_Console:
                     texte += self.CARACTERE_MORTE
             print(texte)
         print(f"Tour {self.jeu.tour} - population {self.jeu.population()}"
-              "   (Ctrl+C pour arrêter)")
+              f" - {self.jeu.description_statut()}   (Ctrl+C pour arrêter)")
 
     def lancer(self):
-        """Boucle principale : afficher, attendre, passer au tour suivant."""
+        """Boucle principale : afficher, attendre, passer au tour suivant.
+
+        La simulation s'arrête d'elle-même si le jeu devient stable, s'éteint
+        ou entre dans un cycle (voir Jdlv.statut).
+        """
         try:
             while self.jeu.tour < self.nb_tours_max:
                 self.afficher()
                 time.sleep(self.delai)
                 self.jeu.tour_suivant()
+                if self.jeu.statut != EN_EVOLUTION:
+                    break
             self.afficher()
         except KeyboardInterrupt:
             print("\nSimulation arrêtée.")

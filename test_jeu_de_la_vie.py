@@ -5,7 +5,7 @@ Lancement : python test_jeu_de_la_vie.py   (ou : python -m pytest)
 """
 
 from cellule import Cellule
-from jdlv import Jdlv
+from jdlv import CYCLE, EN_EVOLUTION, EXTINCTION, STABLE, Jdlv
 from motifs import MOTIFS
 from regle import Regle
 
@@ -124,6 +124,35 @@ def test_age_des_cellules():
     assert jeu.get_cellule(3, 4).age == 0   # extrémité : morte au tour 3
     centre.mourir()
     assert centre.age == 0 and centre.Etat == 0
+
+
+def test_detection_stable_extinction_cycle():
+    jeu = jeu_avec(["OO", "OO"], 4, 4)
+    jeu.tour_suivant()
+    assert jeu.statut == STABLE
+
+    jeu = jeu_avec(["O"], 4, 4)              # une cellule seule meurt
+    jeu.tour_suivant()
+    assert jeu.statut == EXTINCTION
+
+    jeu = jeu_avec(MOTIFS["Pulsar"], 1, 1, largeur=15, hauteur=15)
+    for _ in range(3):
+        assert jeu.statut == EN_EVOLUTION
+        jeu.tour_suivant()
+    assert jeu.statut == CYCLE and jeu.periode == 3
+
+
+def test_retour_arriere():
+    jeu = jeu_avec(MOTIFS["R-pentomino"], 20, 20, largeur=50, hauteur=50)
+    depart = cases_vivantes(jeu)
+    for _ in range(30):
+        jeu.tour_suivant()
+    for _ in range(30):
+        assert jeu.tour_precedent()
+    assert jeu.tour == 0
+    assert cases_vivantes(jeu) == depart
+    assert jeu.tour_precedent() is False     # plus d'historique
+    assert jeu.populations == [5]
 
 
 if __name__ == "__main__":

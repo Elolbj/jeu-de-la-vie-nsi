@@ -10,6 +10,7 @@ régler la vitesse...
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from jdlv import EN_EVOLUTION
 from motifs import MOTIFS, dimensions_motif
 from regle import REGLES
 
@@ -17,6 +18,8 @@ from regle import REGLES
 COULEUR_FOND = "#1e1e2e"      # cellule morte
 COULEUR_LIGNES = "#2a2a3c"    # quadrillage
 COULEUR_VIVANTE = "#a6e3a1"   # cellule vivante (quand on n'affiche pas l'âge)
+COULEUR_COURBE = "#89b4fa"    # courbe de population
+HAUTEUR_COURBE = 80           # hauteur du graphique, en pixels
 
 # Couleur d'une cellule vivante selon son âge : (âge maximum, couleur)
 COULEURS_AGE = [
@@ -35,6 +38,12 @@ AIDE = """Souris
 Clavier
   Espace : démarrer / pause
   Entrée : tour suivant
+  Retour arrière : tour précédent
+
+Statut
+  Le jeu retient les états déjà rencontrés. S'il retombe sur l'un d'eux,
+  il sait que tout va se répéter : il affiche « stable » ou « cycle de
+  période p » et peut mettre l'animation en pause automatiquement.
 
 Règles (notation B/S)
   B = nombres de voisines qui font naître une cellule morte
@@ -68,6 +77,7 @@ class Jdlv_IHM:
 
         self._creer_menu()
         self._creer_canevas()
+        self._creer_courbe()
         self._creer_panneau()
         self._associer_evenements()
         self.dessiner()
@@ -106,6 +116,13 @@ class Jdlv_IHM:
             self.rectangles.append(ligne_rect)
             self.couleurs_affichees.append([COULEUR_FOND] * self.jeu.largeur)
 
+    def _creer_courbe(self):
+        """Crée, sous le tableau, le graphique de l'évolution de la population."""
+        self.courbe = tk.Canvas(self.fenetre, width=self.jeu.largeur * self.taille,
+                                height=HAUTEUR_COURBE, bg=COULEUR_FOND,
+                                highlightthickness=0)
+        self.courbe.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="n")
+
     def _bouton(self, parent, texte, commande):
         """Crée un bouton qui ne prend pas le focus : sinon la touche Espace
         actionnerait aussi ce bouton, en plus du raccourci clavier."""
@@ -116,13 +133,14 @@ class Jdlv_IHM:
     def _creer_panneau(self):
         """Crée le panneau de commandes à droite du tableau."""
         panneau = ttk.Frame(self.fenetre, padding=(0, 10, 10, 10))
-        panneau.grid(row=0, column=1, sticky="n")
+        panneau.grid(row=0, column=1, rowspan=2, sticky="n")
 
         # --- Animation ---
         cadre = ttk.LabelFrame(panneau, text="Animation", padding=8)
         cadre.pack(fill="x", pady=(0, 8))
         self.bouton_lecture = self._bouton(cadre, "Démarrer", self.basculer_lecture)
         self._bouton(cadre, "Tour suivant", self.etape)
+        self._bouton(cadre, "Tour précédent", self.retour_arriere)
         self.vitesse = tk.IntVar(value=10)
         tk.Scale(cadre, from_=1, to=60, orient="horizontal", variable=self.vitesse,
                  label="Vitesse (tours / s)", length=190).pack(fill="x", pady=(4, 0))
@@ -173,8 +191,14 @@ class Jdlv_IHM:
         cadre.pack(fill="x")
         self.texte_tour = tk.StringVar()
         self.texte_population = tk.StringVar()
+        self.texte_statut = tk.StringVar()
         ttk.Label(cadre, textvariable=self.texte_tour).pack(anchor="w")
         ttk.Label(cadre, textvariable=self.texte_population).pack(anchor="w")
+        self.etiquette_statut = ttk.Label(cadre, textvariable=self.texte_statut)
+        self.etiquette_statut.pack(anchor="w")
+        self.pause_auto = tk.BooleanVar(value=True)
+        ttk.Checkbutton(cadre, text="Pause si stable ou cycle", variable=self.pause_auto,
+                        takefocus=False).pack(anchor="w", pady=(4, 0))
 
     def _associer_evenements(self):
         """Relie la souris et le clavier aux actions."""
@@ -183,6 +207,7 @@ class Jdlv_IHM:
         self.canevas.bind("<Shift-Button-1>", self.placer_motif_a_la_souris)
         self.fenetre.bind("<space>", self._raccourci_lecture)
         self.fenetre.bind("<Return>", self._raccourci_etape)
+        self.fenetre.bind("<BackSpace>", self._raccourci_retour)
 
     def _saisie_en_cours(self, evenement):
         """True si l'utilisateur est en train de taper dans une zone de texte :
@@ -196,6 +221,10 @@ class Jdlv_IHM:
     def _raccourci_etape(self, evenement):
         if not self._saisie_en_cours(evenement):
             self.etape()
+
+    def _raccourci_retour(self, evenement):
+        if not self._saisie_en_cours(evenement):
+            self.retour_arriere()
 
     def afficher_aide(self):
         messagebox.showinfo("Aide", AIDE)
@@ -224,6 +253,27 @@ class Jdlv_IHM:
 
         self.texte_tour.set(f"Tour : {self.jeu.tour}")
         self.texte_population.set(f"Population : {self.jeu.population()}")
+        self.texte_statut.set(self.jeu.description_statut())
+        couleur = "black" if self.jeu.statut == EN_EVOLUTION else "#d20f39"
+        self.etiquette_statut.config(foreground=couleur)
+        self.dessiner_courbe()
+
+    def dessiner_courbe(self):
+        """Trace la population des derniers tours (un point tous les 2 pixels)."""
+        self.courbe.delete("all")
+        largeur = int(self.courbe["width"])
+        valeurs = self.jeu.populations[-(largeur // 2):]
+        maximum = max(max(valeurs), 1)
+        points = []
+        for i, valeur in enumerate(valeurs):
+            x = i * 2
+            y = HAUTEUR_COURBE - 5 - valeur * (HAUTEUR_COURBE - 20) / maximum
+            points.extend([x, y])
+        if len(points) >= 4:   # il faut au moins deux points pour une ligne
+            self.courbe.create_line(points, fill=COULEUR_COURBE, width=2)
+        self.courbe.create_text(6, 4, anchor="nw", fill="#cdd6f4",
+                                text=f"Population (max affiché : {maximum})",
+                                font=("TkDefaultFont", 8))
 
     # ------------------------------------------------------------------
     # Animation
@@ -232,6 +282,14 @@ class Jdlv_IHM:
         """Avance d'un tour et rafraîchit l'affichage."""
         self.jeu.tour_suivant()
         self.dessiner()
+
+    def retour_arriere(self):
+        """Revient d'un tour en arrière (si l'historique le permet)."""
+        self.arreter()
+        if self.jeu.tour_precedent():
+            self.dessiner()
+        else:
+            self.fenetre.bell()   # plus d'historique : petit bip
 
     def basculer_lecture(self):
         """Démarre l'animation si elle est arrêtée, la met en pause sinon."""
@@ -260,6 +318,9 @@ class Jdlv_IHM:
         deux tours.
         """
         self.etape()
+        if self.pause_auto.get() and self.jeu.statut != EN_EVOLUTION:
+            self.arreter()
+            return
         delai_ms = 1000 // self.vitesse.get()
         self.id_minuteur = self.fenetre.after(delai_ms, self._boucle)
 
@@ -320,18 +381,15 @@ class Jdlv_IHM:
         if self.jeu.est_dans_grille(x, y):
             cellule = self.jeu.get_cellule(x, y)
             self.mode_dessin = not cellule.est_vivante()
-            self._peindre(cellule)
+            self._peindre(x, y)
 
     def glisser(self, evenement):
         x, y = self._case_sous_souris(evenement)
         if self.jeu.est_dans_grille(x, y):
-            self._peindre(self.jeu.get_cellule(x, y))
+            self._peindre(x, y)
 
-    def _peindre(self, cellule):
-        if self.mode_dessin:
-            cellule.naitre()
-        else:
-            cellule.mourir()
+    def _peindre(self, x, y):
+        self.jeu.modifier_cellule(x, y, self.mode_dessin)
         self.dessiner()
 
     def placer_motif_a_la_souris(self, evenement):
