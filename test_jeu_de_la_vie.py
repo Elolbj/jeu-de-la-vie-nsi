@@ -7,6 +7,7 @@ Lancement : python test_jeu_de_la_vie.py   (ou : python -m pytest)
 from cellule import Cellule
 from jdlv import Jdlv
 from motifs import MOTIFS
+from regle import Regle
 
 
 def jeu_avec(motif, x, y, largeur=10, hauteur=10, torique=False):
@@ -92,6 +93,37 @@ def test_canon_de_gosper_produit_des_planeurs():
         jeu.tour_suivant()
     # Le canon a produit 4 planeurs de 5 cellules chacun.
     assert jeu.population() == population_initiale + 4 * 5
+
+
+def test_notation_des_regles():
+    regle = Regle("b36/s23")
+    assert regle.naissance == {3, 6} and regle.survie == {2, 3}
+    assert Regle("B2/S").survie == set()          # Seeds : aucune survie
+    for notation_invalide in ["B3S23", "X3/S23", "B9/S23", "B3/23", ""]:
+        try:
+            Regle(notation_invalide)
+            assert False, f"{notation_invalide!r} aurait dû être refusée"
+        except ValueError:
+            pass
+
+
+def test_seeds_aucune_cellule_ne_survit():
+    jeu = jeu_avec(["OO", "OO"], 4, 4)   # un bloc, stable avec Conway...
+    jeu.changer_regle("B2/S")
+    avant = cases_vivantes(jeu)
+    jeu.tour_suivant()
+    assert cases_vivantes(jeu).isdisjoint(avant)  # ... mais pas avec Seeds
+
+
+def test_age_des_cellules():
+    jeu = jeu_avec(MOTIFS["Clignotant"], 3, 4)
+    centre = jeu.get_cellule(4, 4)          # la case du milieu ne meurt jamais
+    for _ in range(3):
+        jeu.tour_suivant()
+    assert centre.age == 4
+    assert jeu.get_cellule(3, 4).age == 0   # extrémité : morte au tour 3
+    centre.mourir()
+    assert centre.age == 0 and centre.Etat == 0
 
 
 if __name__ == "__main__":

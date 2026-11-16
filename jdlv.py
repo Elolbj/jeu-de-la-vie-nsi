@@ -14,6 +14,7 @@ import random
 
 from cellule import Cellule
 from motifs import coordonnees_motif
+from regle import Regle
 
 
 class Jdlv:
@@ -24,11 +25,12 @@ class Jdlv:
     Le tableau se comporte alors comme la surface d'un donut (un tore).
     """
 
-    def __init__(self, largeur=70, hauteur=50, torique=True):
+    def __init__(self, largeur=70, hauteur=50, torique=True, regle="B3/S23"):
         assert largeur >= 3 and hauteur >= 3, "le tableau doit faire au moins 3x3"
         self.largeur = largeur
         self.hauteur = hauteur
         self.torique = torique
+        self.regle = Regle(regle)   # règle de naissance / survie (Conway par défaut)
         self.tour = 0
         # self.grille[y][x] : y = numéro de ligne, x = numéro de colonne
         self.grille = [[Cellule() for x in range(largeur)] for y in range(hauteur)]
@@ -60,6 +62,10 @@ class Jdlv:
         """Active ou désactive les bords reliés, puis recalcule les voisinages."""
         self.torique = torique
         self._relier_voisines()
+
+    def changer_regle(self, notation):
+        """Change la règle du jeu (ex. "B36/S23"). Lève ValueError si invalide."""
+        self.regle = Regle(notation)
 
     # ------------------------------------------------------------------
     # Accès aux cellules
@@ -127,7 +133,7 @@ class Jdlv:
         """
         for ligne in self.grille:
             for cellule in ligne:
-                cellule.calculer_etat_suivant()
+                cellule.calculer_etat_suivant(self.regle)
         for ligne in self.grille:
             for cellule in ligne:
                 cellule.passer_a_l_etat_suivant()
