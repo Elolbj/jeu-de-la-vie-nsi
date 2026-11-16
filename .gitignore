@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .graphify_*
 graphify-out/cache/
+graphify-out/obsidian/
+graphify-out/manifest.json
+graphify-out/cost.json
