@@ -1,17 +1,22 @@
 """
 Module cellule : définit la classe Cellule du jeu de la vie.
 
-Une cellule est soit vivante, soit morte. Elle connaît ses voisines,
-ce qui lui permet de calculer elle-même son état à la génération suivante.
+Une cellule possède un attribut Etat (entier) : 0 = morte, 1 = vivante.
+Elle connaît ses voisines, ce qui lui permet de calculer elle-même son état
+au tour suivant.
 """
+
+MORTE = 0
+VIVANTE = 1
 
 
 class Cellule:
-    """Une case de la grille du jeu de la vie."""
+    """Une case du tableau du jeu de la vie."""
 
-    def __init__(self, vivante=False):
-        self.vivante = vivante        # état actuel (True = vivante)
-        self.etat_suivant = vivante   # état calculé pour la prochaine génération
+    def __init__(self, etat=MORTE):
+        assert etat in (MORTE, VIVANTE), "l'état d'une cellule vaut 0 ou 1"
+        self.Etat = etat              # état actuel : 0 (morte) ou 1 (vivante)
+        self.etat_suivant = etat      # état calculé pour le tour suivant
         self.voisines = []            # liste des cellules voisines (au plus 8)
 
     # ------------------------------------------------------------------
@@ -19,19 +24,19 @@ class Cellule:
     # ------------------------------------------------------------------
     def est_vivante(self):
         """Renvoie True si la cellule est vivante."""
-        return self.vivante
+        return self.Etat == VIVANTE
 
     def naitre(self):
         """Rend la cellule vivante."""
-        self.vivante = True
+        self.Etat = VIVANTE
 
     def mourir(self):
         """Rend la cellule morte."""
-        self.vivante = False
+        self.Etat = MORTE
 
     def basculer(self):
-        """Inverse l'état de la cellule (vivante <-> morte)."""
-        self.vivante = not self.vivante
+        """Inverse l'état de la cellule (0 <-> 1)."""
+        self.Etat = 1 - self.Etat
 
     # ------------------------------------------------------------------
     # Voisinage
@@ -41,18 +46,20 @@ class Cellule:
         self.voisines.append(cellule)
 
     def nombre_voisines_vivantes(self):
-        """Compte les voisines vivantes."""
-        compteur = 0
+        """Compte les voisines vivantes.
+
+        Comme Etat vaut 0 ou 1, il suffit d'additionner les états des voisines.
+        """
+        total = 0
         for voisine in self.voisines:
-            if voisine.est_vivante():
-                compteur += 1
-        return compteur
+            total += voisine.Etat
+        return total
 
     # ------------------------------------------------------------------
     # Règles de Conway
     # ------------------------------------------------------------------
     def calculer_etat_suivant(self):
-        """Calcule (sans l'appliquer) l'état de la cellule à la génération suivante.
+        """Calcule (sans l'appliquer) l'état de la cellule au tour suivant.
 
         Règles de John Horton Conway :
           - une cellule morte avec exactement 3 voisines vivantes naît ;
@@ -60,14 +67,20 @@ class Cellule:
           - dans tous les autres cas, la cellule meurt ou reste morte.
         """
         n = self.nombre_voisines_vivantes()
-        if self.vivante:
-            self.etat_suivant = (n == 2 or n == 3)
+        if self.est_vivante():
+            if n == 2 or n == 3:
+                self.etat_suivant = VIVANTE
+            else:
+                self.etat_suivant = MORTE
         else:
-            self.etat_suivant = (n == 3)
+            if n == 3:
+                self.etat_suivant = VIVANTE
+            else:
+                self.etat_suivant = MORTE
 
     def passer_a_l_etat_suivant(self):
         """Applique l'état calculé par calculer_etat_suivant()."""
-        self.vivante = self.etat_suivant
+        self.Etat = self.etat_suivant
 
     def __str__(self):
-        return "#" if self.vivante else "."
+        return "#" if self.est_vivante() else "."

@@ -1,8 +1,8 @@
 """
-Module affichage : fenêtre graphique (Tkinter) du jeu de la vie.
+Module jdlv_ihm : interface graphique (Tkinter) du jeu de la vie.
 
-La classe FenetreJeu affiche une Grille et permet d'interagir avec elle :
-lancer / mettre en pause l'animation, avancer d'une génération, dessiner
+La classe Jdlv_IHM affiche un jeu (Jdlv) et permet d'interagir avec elle :
+lancer / mettre en pause l'animation, avancer d'un tour, dessiner
 des cellules à la souris, placer des motifs célèbres, régler la vitesse...
 """
 
@@ -17,11 +17,11 @@ COULEUR_VIVANTE = "#a6e3a1"   # cellule vivante
 COULEUR_LIGNES = "#2a2a3c"    # quadrillage
 
 
-class FenetreJeu:
-    """Fenêtre Tkinter qui affiche et anime une Grille."""
+class Jdlv_IHM:
+    """Interface graphique (Tkinter + Canvas) qui affiche et anime un Jdlv."""
 
-    def __init__(self, grille, taille_cellule=12):
-        self.grille = grille
+    def __init__(self, jeu, taille_cellule=12):
+        self.jeu = jeu
         self.taille = taille_cellule  # côté d'une case, en pixels
         self.en_cours = False         # True quand l'animation tourne
         self.id_minuteur = None       # identifiant renvoyé par after()
@@ -41,8 +41,8 @@ class FenetreJeu:
     # ------------------------------------------------------------------
     def _creer_canevas(self):
         """Crée la zone de dessin et un rectangle par cellule."""
-        largeur_px = self.grille.largeur * self.taille
-        hauteur_px = self.grille.hauteur * self.taille
+        largeur_px = self.jeu.largeur * self.taille
+        hauteur_px = self.jeu.hauteur * self.taille
         self.canevas = tk.Canvas(self.fenetre, width=largeur_px, height=hauteur_px,
                                  bg=COULEUR_FOND, highlightthickness=0)
         self.canevas.grid(row=0, column=0, padx=10, pady=10)
@@ -51,9 +51,9 @@ class FenetreJeu:
         # changer leur couleur, ce qui est beaucoup plus rapide.
         self.rectangles = []
         self.etat_affiche = []  # ce qui est actuellement dessiné à l'écran
-        for y in range(self.grille.hauteur):
+        for y in range(self.jeu.hauteur):
             ligne_rect = []
-            for x in range(self.grille.largeur):
+            for x in range(self.jeu.largeur):
                 x0 = x * self.taille
                 y0 = y * self.taille
                 rect = self.canevas.create_rectangle(
@@ -61,7 +61,7 @@ class FenetreJeu:
                     fill=COULEUR_FOND, outline=COULEUR_LIGNES)
                 ligne_rect.append(rect)
             self.rectangles.append(ligne_rect)
-            self.etat_affiche.append([False] * self.grille.largeur)
+            self.etat_affiche.append([False] * self.jeu.largeur)
 
     def _creer_panneau(self):
         """Crée le panneau de commandes à droite de la grille."""
@@ -76,12 +76,12 @@ class FenetreJeu:
                                          command=self.basculer_lecture,
                                          takefocus=False)
         self.bouton_lecture.pack(fill="x", pady=2)
-        ttk.Button(cadre_anim, text="Génération suivante",
+        ttk.Button(cadre_anim, text="Tour suivant",
                    command=self.etape, takefocus=False).pack(fill="x", pady=2)
 
         self.vitesse = tk.IntVar(value=10)
         tk.Scale(cadre_anim, from_=1, to=60, orient="horizontal",
-                 variable=self.vitesse, label="Vitesse (générations / s)",
+                 variable=self.vitesse, label="Vitesse (tours / s)",
                  length=180).pack(fill="x", pady=(6, 0))
 
         # --- Grille ---
@@ -93,7 +93,7 @@ class FenetreJeu:
         ttk.Button(cadre_grille, text="Tout effacer",
                    command=self.effacer, takefocus=False).pack(fill="x", pady=2)
 
-        self.torique = tk.BooleanVar(value=self.grille.torique)
+        self.torique = tk.BooleanVar(value=self.jeu.torique)
         ttk.Checkbutton(cadre_grille, text="Bords reliés (tore)",
                         variable=self.torique,
                         command=self.changer_torique,
@@ -116,16 +116,16 @@ class FenetreJeu:
         cadre_stats = ttk.LabelFrame(panneau, text="Statistiques", padding=8)
         cadre_stats.pack(fill="x", pady=(0, 10))
 
-        self.texte_generation = tk.StringVar()
+        self.texte_tour = tk.StringVar()
         self.texte_population = tk.StringVar()
-        ttk.Label(cadre_stats, textvariable=self.texte_generation).pack(anchor="w")
+        ttk.Label(cadre_stats, textvariable=self.texte_tour).pack(anchor="w")
         ttk.Label(cadre_stats, textvariable=self.texte_population).pack(anchor="w")
 
         # --- Aide ---
         aide = ("Clic + glisser : dessiner / effacer\n"
                 "Maj + clic : placer le motif choisi\n"
                 "Espace : démarrer / pause\n"
-                "Entrée : génération suivante")
+                "Entrée : tour suivant")
         ttk.Label(panneau, text=aide, justify="left",
                   foreground="#666666").pack(anchor="w")
 
@@ -149,23 +149,23 @@ class FenetreJeu:
 
         Seules les cases qui ont changé sont redessinées.
         """
-        for y in range(self.grille.hauteur):
-            for x in range(self.grille.largeur):
-                vivante = self.grille.get_cellule(x, y).est_vivante()
+        for y in range(self.jeu.hauteur):
+            for x in range(self.jeu.largeur):
+                vivante = self.jeu.get_cellule(x, y).est_vivante()
                 if vivante != self.etat_affiche[y][x]:
                     couleur = COULEUR_VIVANTE if vivante else COULEUR_FOND
                     self.canevas.itemconfig(self.rectangles[y][x], fill=couleur)
                     self.etat_affiche[y][x] = vivante
 
-        self.texte_generation.set(f"Génération : {self.grille.generation}")
-        self.texte_population.set(f"Population : {self.grille.population()}")
+        self.texte_tour.set(f"Tour : {self.jeu.tour}")
+        self.texte_population.set(f"Population : {self.jeu.population()}")
 
     # ------------------------------------------------------------------
     # Animation
     # ------------------------------------------------------------------
     def etape(self):
-        """Avance d'une génération et rafraîchit l'affichage."""
-        self.grille.generation_suivante()
+        """Avance d'un tour et rafraîchit l'affichage."""
+        self.jeu.tour_suivant()
         self.dessiner()
 
     def basculer_lecture(self):
@@ -188,7 +188,7 @@ class FenetreJeu:
             self.id_minuteur = None
 
     def _boucle(self):
-        """Calcule une génération puis se reprogramme elle-même avec after()."""
+        """Calcule un tour puis se reprogramme elle-même avec after()."""
         self.etape()
         delai_ms = 1000 // self.vitesse.get()
         self.id_minuteur = self.fenetre.after(delai_ms, self._boucle)
@@ -197,26 +197,26 @@ class FenetreJeu:
     # Actions sur la grille
     # ------------------------------------------------------------------
     def remplir_aleatoirement(self):
-        self.grille.remplir_aleatoirement(0.25)
+        self.jeu.remplir_aleatoirement(0.25)
         self.dessiner()
 
     def effacer(self):
         self.arreter()
-        self.grille.vider()
+        self.jeu.vider()
         self.dessiner()
 
     def changer_torique(self):
-        self.grille.changer_torique(self.torique.get())
+        self.jeu.changer_torique(self.torique.get())
 
     def placer_motif(self, x, y):
         """Place le motif choisi centré sur la case (x, y)."""
         motif = MOTIFS[self.motif_choisi.get()]
         largeur, hauteur = dimensions_motif(motif)
-        self.grille.placer_motif(motif, x - largeur // 2, y - hauteur // 2)
+        self.jeu.placer_motif(motif, x - largeur // 2, y - hauteur // 2)
         self.dessiner()
 
     def placer_motif_au_centre(self):
-        self.placer_motif(self.grille.largeur // 2, self.grille.hauteur // 2)
+        self.placer_motif(self.jeu.largeur // 2, self.jeu.hauteur // 2)
 
     # ------------------------------------------------------------------
     # Souris
@@ -229,15 +229,15 @@ class FenetreJeu:
         """Au clic, on inverse la case. Le glisser qui suit continuera dans le
         même sens : dessiner si la case était morte, effacer si elle était vivante."""
         x, y = self._case_sous_souris(evenement)
-        if self.grille.est_dans_grille(x, y):
-            cellule = self.grille.get_cellule(x, y)
+        if self.jeu.est_dans_grille(x, y):
+            cellule = self.jeu.get_cellule(x, y)
             self.mode_dessin = not cellule.est_vivante()
             self._peindre(cellule)
 
     def glisser(self, evenement):
         x, y = self._case_sous_souris(evenement)
-        if self.grille.est_dans_grille(x, y):
-            self._peindre(self.grille.get_cellule(x, y))
+        if self.jeu.est_dans_grille(x, y):
+            self._peindre(self.jeu.get_cellule(x, y))
 
     def _peindre(self, cellule):
         if self.mode_dessin:
@@ -248,7 +248,7 @@ class FenetreJeu:
 
     def placer_motif_a_la_souris(self, evenement):
         x, y = self._case_sous_souris(evenement)
-        if self.grille.est_dans_grille(x, y):
+        if self.jeu.est_dans_grille(x, y):
             self.placer_motif(x, y)
 
     # ------------------------------------------------------------------
