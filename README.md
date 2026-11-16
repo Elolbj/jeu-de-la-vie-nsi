@@ -44,6 +44,13 @@ On peut aussi les lancer avec pytest :
 python -m pytest
 ```
 
+**Version téléphone** : `web/jeu_de_la_vie.html` s'ouvre dans n'importe quel
+navigateur, sur ordinateur ou sur téléphone, sans rien installer. Tkinter ne
+fonctionne pas sur un téléphone, donc les classes Python y sont traduites en
+JavaScript, avec les mêmes noms : `Cellule.Etat`, `Jdlv.grille`, `Jdlv.tour`,
+`tour_suivant()`, `Jdlv_IHM`... On y dessine au doigt, et on y retrouve les
+règles, les motifs, la détection des cycles et les fichiers RLE.
+
 Depuis un programme, on crée un jeu en instanciant `Jdlv` puis on le lance avec `start()` :
 
 ```python
@@ -145,6 +152,7 @@ classDiagram
 | `motifs.py` | dictionnaire `MOTIFS` des motifs célèbres |
 | `rle.py` | lecture / écriture des fichiers de motifs `.rle` |
 | `main.py` | programme principal |
+| `web/jeu_de_la_vie.html` | version web jouable au doigt (mêmes classes, traduites en JavaScript) |
 | `test_jeu_de_la_vie.py` | les tests |
 
 **Séparation calcul / affichage** : `Cellule`, `Regle` et `Jdlv` ne savent rien de
