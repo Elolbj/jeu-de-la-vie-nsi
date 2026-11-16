@@ -6,9 +6,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600&display=swap">
 <style>
-/* Mise en page : un seul écran. Tableau au centre, commandes en bas sous le pouce,
-   réglages dans un panneau qui monte du bas (téléphone) ou à droite (grand écran).
-   Thème sombre unique, comme la version Tkinter du projet. */
+/* Mise en page : un seul écran. Le damier remplit la scène (zoom et déplacement
+   comme une carte), commandes en bas sous le pouce, réglages dans un panneau qui
+   monte du bas (téléphone) ou à droite (grand écran). Thème sombre unique,
+   comme la version Tkinter du projet. */
 :root {
   --bg: #11111b;
   --surface: #1e1e2e;
@@ -49,23 +50,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .principal { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 
-/* --- En-tête : nom + statistiques --- */
-.entete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+/* --- En-tête --- */
+.entete { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
 .entete h1 { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
 .entete h1 span { color: var(--muted); font-weight: 400; }
-.stats { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; font-family: var(--font-data); font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.stats { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; font-family: var(--font-data); font-size: 0.78rem; font-variant-numeric: tabular-nums; color: var(--muted); }
 .stats b { color: var(--fg); font-weight: 600; }
 .puce { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-family: var(--font-ui); font-size: 0.75rem; }
 .puce.alerte { border-color: var(--warn); color: var(--warn); }
 .puce.fin { border-color: var(--danger); color: var(--danger); }
 
-/* --- Tableau --- */
-.scene { position: relative; flex: 1; min-height: 120px; }
-#tableau {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  touch-action: none; border-radius: 4px; cursor: crosshair;
-  box-shadow: 0 0 0 1px var(--line);
-}
+/* --- Damier --- */
+.scene { position: relative; flex: 1; min-height: 140px; border-radius: 8px; overflow: hidden; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+#tableau { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#tableau.dessin { cursor: crosshair; }
+#tableau.deplacement { cursor: grab; }
 .mode-motif {
   position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 8px; max-width: calc(100% - 16px);
@@ -74,13 +73,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .mode-motif span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mode-motif button { border: 0; background: rgba(17, 17, 27, 0.15); color: var(--accent-ink); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.outils {
+  position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; align-items: center;
+}
+.groupe { display: flex; background: rgba(30, 30, 46, 0.92); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.outil { width: 40px; height: 40px; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; touch-action: manipulation; }
+.outil + .outil { border-left: 1px solid var(--line); }
+.outil svg { width: 20px; height: 20px; fill: var(--fg); }
+.outil[aria-pressed="true"] { background: var(--accent); }
+.outil[aria-pressed="true"] svg { fill: var(--accent-ink); }
+.echelle {
+  position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 6px; pointer-events: none;
+  background: rgba(30, 30, 46, 0.92); border: 1px solid var(--line);
+  font-family: var(--font-data); font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
 
-/* --- Courbe de population --- */
-.courbe-cadre { position: relative; height: 44px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+/* --- Courbe --- */
+.courbe-cadre { position: relative; height: 40px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
 #courbe { width: 100%; height: 100%; display: block; }
-.courbe-cadre small { position: absolute; left: 8px; top: 4px; font-family: var(--font-data); font-size: 0.68rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.courbe-cadre small { position: absolute; left: 8px; top: 3px; font-family: var(--font-data); font-size: 0.68rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* --- Commandes (au pouce) --- */
+/* --- Commandes --- */
 .commandes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -93,11 +106,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.principal-btn { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn.principal-btn svg { fill: var(--accent-ink); }
 
-/* --- Panneau de réglages --- */
+/* --- Panneau --- */
 .panneau {
   display: none;
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  max-height: 72%; overflow-y: auto; overscroll-behavior: contain;
+  max-height: 74%; overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -115,26 +128,25 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .section h3 { margin: 0; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .ligne { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ligne > * { min-width: 0; }
-select, input[type="text"], textarea {
+select, input[type="text"], input[type="number"], textarea {
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; flex: 1 1 140px;
 }
+input[type="number"] { flex: 1 1 80px; width: 6em; font-family: var(--font-data); }
 textarea { font-family: var(--font-data); font-size: 0.78rem; min-height: 84px; resize: vertical; width: 100%; box-sizing: border-box; }
 .notation { font-family: var(--font-data); text-transform: uppercase; }
-.action {
-  border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 9px 12px; cursor: pointer; flex: 0 0 auto;
-}
+.action { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 9px 12px; cursor: pointer; flex: 0 0 auto; }
 .action.vif { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .case { display: flex; gap: 10px; align-items: center; cursor: pointer; }
 .case input { width: 20px; height: 20px; accent-color: var(--accent); }
 input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
 .valeur { font-family: var(--font-data); font-variant-numeric: tabular-nums; min-width: 6ch; text-align: right; color: var(--muted); }
-.legende { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--muted); }
+.legende { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--muted); flex-wrap: wrap; }
 .legende i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
 .aide { margin: 0; font-size: 0.82rem; line-height: 1.5; color: var(--muted); max-width: 65ch; }
-.aide code { font-family: var(--font-data); color: var(--fg); }
+.aide code, .aide b { color: var(--fg); }
+.aide code { font-family: var(--font-data); }
 .fichier { font-size: 0.8rem; color: var(--muted); }
 
-/* --- Message temporaire --- */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
   bottom: calc(84px + env(safe-area-inset-bottom, 0px));
@@ -143,10 +155,8 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
 }
 .toast.erreur { background: var(--danger); }
 
-/* --- Grand écran : panneau toujours visible à droite --- */
 @media (min-width: 900px) {
   .app { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
-  .principal { min-height: 0; }
   .panneau { display: block; position: static; max-height: none; height: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; box-shadow: none; padding: 4px 16px 16px; }
   .panneau-haut .fermer, .btn-reglages, .voile { display: none !important; }
   .commandes { grid-template-columns: repeat(5, 1fr); }
@@ -160,17 +170,40 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
     <header class="entete">
       <h1>Jeu de la vie <span>· Conway</span></h1>
       <div class="stats" aria-live="polite">
+        <span><b id="stat-taille">200×200</b></span>
         <span>Tour <b id="stat-tour">0</b></span>
-        <span>Population <b id="stat-pop">0</b></span>
+        <span>Pop. <b id="stat-pop">0</b></span>
         <span id="stat-statut" class="puce">En évolution</span>
       </div>
     </header>
 
     <div class="scene" id="scene">
-      <canvas id="tableau" aria-label="Tableau du jeu de la vie : touchez pour dessiner des cellules"></canvas>
+      <canvas id="tableau" class="dessin" aria-label="Damier du jeu de la vie : un doigt dessine, deux doigts zooment et déplacent"></canvas>
       <div class="mode-motif" id="mode-motif" hidden>
         <span id="mode-motif-texte">Touchez pour placer : Planeur</span>
         <button type="button" id="mode-motif-fin">Terminé</button>
+      </div>
+      <span class="echelle" id="echelle">×1</span>
+      <div class="outils">
+        <div class="groupe" role="group" aria-label="Outil">
+          <button class="outil" type="button" id="o-dessin" aria-pressed="true" title="Dessiner">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.9-9.9-2.8-2.8zM19.7 7.1a1 1 0 0 0 0-1.4l-1.4-1.4a1 1 0 0 0-1.4 0l-1.6 1.6 2.8 2.8z"/></svg>
+          </button>
+          <button class="outil" type="button" id="o-deplacement" aria-pressed="false" title="Déplacer le damier">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.5 3.5h-2.5V11h5.5V8.5L22 12l-3.5 3.5V13H13v5.5h2.5L12 22l-3.5-3.5H11V13H5.5v2.5L2 12l3.5-3.5V11H11V5.5H8.5z"/></svg>
+          </button>
+        </div>
+        <div class="groupe" role="group" aria-label="Zoom">
+          <button class="outil" type="button" id="o-moins" title="Dézoomer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v2H5z"/></svg>
+          </button>
+          <button class="outil" type="button" id="o-plus" title="Zoomer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+          </button>
+          <button class="outil" type="button" id="o-tout" title="Voir tout le damier">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -209,20 +242,41 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
     </div>
 
     <section class="section">
+      <h3>Taille du damier</h3>
+      <div class="ligne">
+        <select id="taille-damier" aria-label="Taille du damier">
+          <option value="ecran">Adaptée à l'écran (cases de 10 px)</option>
+          <option value="200x200" selected>Grand · 200 × 200</option>
+          <option value="500x500">Très grand · 500 × 500</option>
+          <option value="1000x1000">Immense · 1 000 × 1 000</option>
+          <option value="2000x2000">Gigantesque · 2 000 × 2 000</option>
+          <option value="3000x3000">Colossal · 3 000 × 3 000</option>
+          <option value="perso">Personnalisée…</option>
+        </select>
+      </div>
+      <div class="ligne" id="taille-perso" hidden>
+        <input type="number" id="perso-largeur" min="10" max="4000" value="800" inputmode="numeric" aria-label="Largeur (colonnes)">
+        <span>×</span>
+        <input type="number" id="perso-hauteur" min="10" max="4000" value="600" inputmode="numeric" aria-label="Hauteur (lignes)">
+        <button class="action vif" type="button" id="b-taille">Appliquer</button>
+      </div>
+      <p class="aide" id="taille-info">200 × 200 = 40 000 cases.</p>
+      <p class="aide">Deux doigts pour zoomer et déplacer, ou les boutons <b>+</b>, <b>−</b> et <b>Voir tout</b> en bas du damier. Les cellules vivantes sont gardées quand on change de taille.</p>
+    </section>
+
+    <section class="section">
       <h3>Animation</h3>
       <div class="ligne">
         <label for="vitesse">Vitesse</label>
-        <input type="range" id="vitesse" min="1" max="60" value="12">
-        <span class="valeur" id="vitesse-valeur">12 t/s</span>
+        <input type="range" id="vitesse" min="1" max="60" value="15">
+        <span class="valeur" id="vitesse-valeur">15 t/s</span>
       </div>
       <label class="case"><input type="checkbox" id="pause-auto" checked> Pause si stable, éteint ou en cycle</label>
     </section>
 
     <section class="section">
       <h3>Règle (notation B/S)</h3>
-      <div class="ligne">
-        <select id="regle" aria-label="Règle"></select>
-      </div>
+      <div class="ligne"><select id="regle" aria-label="Règle"></select></div>
       <div class="ligne">
         <input type="text" id="regle-perso" class="notation" placeholder="ex. B36/S23" aria-label="Règle personnalisée" autocomplete="off" autocapitalize="characters" spellcheck="false">
         <button class="action" type="button" id="b-regle">Appliquer</button>
@@ -234,24 +288,16 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
       <h3>Motifs</h3>
       <div class="ligne"><select id="motif" aria-label="Motif"></select></div>
       <div class="ligne">
-        <button class="action vif" type="button" id="b-motif-centre">Placer au centre</button>
+        <button class="action vif" type="button" id="b-motif-centre">Placer au centre de la vue</button>
         <button class="action" type="button" id="b-motif-toucher">Placer en touchant</button>
       </div>
     </section>
 
     <section class="section">
-      <h3>Tableau</h3>
-      <label class="case"><input type="checkbox" id="torique"> Bords reliés (tore)</label>
+      <h3>Affichage</h3>
+      <label class="case"><input type="checkbox" id="torique" checked> Bords reliés (tore)</label>
       <label class="case"><input type="checkbox" id="couleur-age" checked> Couleur selon l'âge</label>
       <div class="legende" aria-hidden="true">jeune <i style="background:#f9e2af"></i><i style="background:#a6e3a1"></i><i style="background:#94e2d5"></i><i style="background:#89dceb"></i><i style="background:#89b4fa"></i><i style="background:#cba6f7"></i> ancienne (20 tours et +)</div>
-      <div class="ligne">
-        <label for="taille">Taille des cases</label>
-        <select id="taille">
-          <option value="grandes">Grandes</option>
-          <option value="moyennes" selected>Moyennes</option>
-          <option value="petites">Petites</option>
-        </select>
-      </div>
     </section>
 
     <section class="section">
@@ -259,7 +305,7 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
       <textarea id="rle" spellcheck="false" aria-label="Texte au format RLE" placeholder="x = 3, y = 3, rule = B3/S23&#10;bo$2bo$3o!"></textarea>
       <div class="ligne">
         <button class="action vif" type="button" id="b-rle-charger">Charger ce texte</button>
-        <button class="action" type="button" id="b-rle-copier">Copier le tableau en RLE</button>
+        <button class="action" type="button" id="b-rle-copier">Copier le damier en RLE</button>
       </div>
       <label class="fichier" for="rle-fichier">Ou ouvrir un fichier .rle :</label>
       <input type="file" id="rle-fichier" accept=".rle,.txt,text/plain">
@@ -267,7 +313,7 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
 
     <section class="section">
       <h3>À propos</h3>
-      <p class="aide">Version web du projet POO de Terminale NSI. Les classes Python <code>Cellule</code> (attribut <code>Etat</code>), <code>Regle</code>, <code>Jdlv</code> (<code>grille</code>, <code>tour</code>, <code>start()</code>) et <code>Jdlv_IHM</code> sont traduites en JavaScript avec les mêmes noms. Au clavier : Espace, Entrée, Retour arrière.</p>
+      <p class="aide">Version web du projet POO de Terminale NSI : <code>Regle</code>, <code>Jdlv</code> (<code>grille</code>, <code>tour</code>, <code>tour_suivant()</code>, <code>start()</code>) et <code>Jdlv_IHM</code> gardent les noms du code Python. Pour tenir des millions de cases sur un téléphone, les <code>Etat</code> des cellules sont rangés dans un tableau d'octets (<code>Uint8Array</code>) au lieu d'un objet <code>Cellule</code> par case. Au clavier : Espace, Entrée, Retour arrière ; molette pour zoomer.</p>
     </section>
   </aside>
 
@@ -277,24 +323,19 @@ input[type="range"] { flex: 1 1 160px; accent-color: var(--accent); }
 <script>
 "use strict";
 /* =====================================================================
-   Traduction en JavaScript des classes Python du projet.
-   Mêmes noms d'attributs et de méthodes que cellule.py, regle.py,
-   jdlv.py, rle.py et jdlv_ihm.py.
+   Traduction en JavaScript du projet Python (regle.py, jdlv.py, rle.py,
+   jdlv_ihm.py), avec les mêmes noms.
+   Différence : pour les damiers immenses, Jdlv range l'Etat de chaque case
+   dans un Uint8Array (1 octet par case) au lieu d'un objet Cellule.
    ===================================================================== */
-
 const MORTE = 0;
 const VIVANTE = 1;
+const MAX_CASES = 9000000;   // 3 000 × 3 000 : au-delà, trop lourd pour un téléphone
 
 // ---------------------------------------------------------------- regle.py
 const REGLES = {
-  "Conway": "B3/S23",
-  "HighLife": "B36/S23",
-  "Seeds": "B2/S",
-  "Day & Night": "B3678/S34678",
-  "Réplicateur": "B1357/S1357",
-  "Labyrinthe": "B3/S12345",
-  "34 Life": "B34/S34",
-  "Vie sans mort": "B3/S012345678",
+  "Conway": "B3/S23", "HighLife": "B36/S23", "Seeds": "B2/S", "Day & Night": "B3678/S34678",
+  "Réplicateur": "B1357/S1357", "Labyrinthe": "B3/S12345", "34 Life": "B34/S34", "Vie sans mort": "B3/S012345678",
 };
 
 class Regle {
@@ -306,52 +347,19 @@ class Regle {
     }
     this.naissance = new Set([...morceaux[0].slice(1)].map((c) => this._nombre_de_voisines(c)));
     this.survie = new Set([...morceaux[1].slice(1)].map((c) => this._nombre_de_voisines(c)));
-    // Tables de 9 cases (0 à 8 voisines) : plus rapide qu'un Set à chaque cellule
-    this._table_naissance = [];
-    this._table_survie = [];
+    this._table_naissance = new Uint8Array(9);
+    this._table_survie = new Uint8Array(9);
     for (let n = 0; n <= 8; n++) {
-      this._table_naissance.push(this.naissance.has(n) ? VIVANTE : MORTE);
-      this._table_survie.push(this.survie.has(n) ? VIVANTE : MORTE);
+      this._table_naissance[n] = this.naissance.has(n) ? VIVANTE : MORTE;
+      this._table_survie[n] = this.survie.has(n) ? VIVANTE : MORTE;
     }
   }
   _nombre_de_voisines(caractere) {
-    if (!/^[0-8]$/.test(caractere)) {
-      throw new Error(`« ${caractere} » n'est pas un nombre de voisines (0 à 8)`);
-    }
+    if (!/^[0-8]$/.test(caractere)) throw new Error(`« ${caractere} » n'est pas un nombre de voisines (0 à 8)`);
     return Number(caractere);
   }
-  etat_suivant(etat, nb_voisines_vivantes) {
-    return etat === VIVANTE ? this._table_survie[nb_voisines_vivantes] : this._table_naissance[nb_voisines_vivantes];
-  }
+  etat_suivant(etat, n) { return etat === VIVANTE ? this._table_survie[n] : this._table_naissance[n]; }
   toString() { return this.notation; }
-}
-
-// -------------------------------------------------------------- cellule.py
-const CONWAY = new Regle("B3/S23");
-
-class Cellule {
-  constructor(etat = MORTE) {
-    this.Etat = etat;            // 0 (morte) ou 1 (vivante)
-    this.etat_suivant = etat;    // calculé avant d'être appliqué
-    this.age = etat;             // tours consécutifs en vie
-    this.voisines = [];          // au plus 8 cellules
-  }
-  est_vivante() { return this.Etat === VIVANTE; }
-  naitre() { if (!this.est_vivante()) { this.Etat = VIVANTE; this.age = 1; } }
-  mourir() { this.Etat = MORTE; this.age = 0; }
-  ajouter_voisine(cellule) { this.voisines.push(cellule); }
-  nombre_voisines_vivantes() {
-    let total = 0;
-    for (const voisine of this.voisines) total += voisine.Etat;
-    return total;
-  }
-  calculer_etat_suivant(regle = CONWAY) {
-    this.etat_suivant = regle.etat_suivant(this.Etat, this.nombre_voisines_vivantes());
-  }
-  passer_a_l_etat_suivant() {
-    this.age = this.etat_suivant === VIVANTE ? this.age + 1 : 0;
-    this.Etat = this.etat_suivant;
-  }
 }
 
 // --------------------------------------------------------------- motifs.py
@@ -359,14 +367,10 @@ const MOTIFS = {
   "Planeur": [".O.", "..O", "OOO"],
   "Vaisseau léger": [".O..O", "O....", "O...O", "OOOO."],
   "Canon de Gosper": [
-    "........................O...........",
-    "......................O.O...........",
-    "............OO......OO............OO",
-    "...........O...O....OO............OO",
-    "OO........O.....O...OO..............",
-    "OO........O...O.OO....O.O...........",
-    "..........O.....O.......O...........",
-    "...........O...O....................",
+    "........................O...........", "......................O.O...........",
+    "............OO......OO............OO", "...........O...O....OO............OO",
+    "OO........O.....O...OO..............", "OO........O...O.OO....O.O...........",
+    "..........O.....O.......O...........", "...........O...O....................",
     "............OO......................",
   ],
   "Clignotant": ["OOO"],
@@ -378,207 +382,255 @@ const MOTIFS = {
   ],
   "Pentadécathlon": ["..O....O..", "OO.OOOO.OO", "..O....O.."],
   "R-pentomino": [".OO", "OO.", ".O."],
-  "Gland": [".O.....", "...O...", "OO..OOO"],
+  "Gland (5 206 tours)": [".O.....", "...O...", "OO..OOO"],
   "Diehard": ["......O.", "OO......", ".O...OOO"],
 };
-// Motif qui a besoin d'une autre règle : il est fourni au format RLE
 const EXEMPLES_RLE = {
   "Réplicateur (règle HighLife)": "#N Réplicateur\nx = 5, y = 5, rule = B36/S23\n2b3o$bo2bo$o3bo$o2bo$3o!\n",
 };
-
 function coordonnees_motif(motif) {
   const positions = [];
-  motif.forEach((ligne, dy) => {
-    [...ligne].forEach((caractere, dx) => { if (caractere === "O") positions.push([dx, dy]); });
-  });
+  motif.forEach((ligne, dy) => { [...ligne].forEach((c, dx) => { if (c === "O") positions.push([dx, dy]); }); });
   return positions;
 }
-function dimensions_motif(motif) {
-  return [Math.max(0, ...motif.map((l) => l.length)), motif.length];
-}
+function dimensions_motif(motif) { return [Math.max(0, ...motif.map((l) => l.length)), motif.length]; }
 
 // ----------------------------------------------------------------- jdlv.py
-const EN_EVOLUTION = "en évolution";
-const EXTINCTION = "extinction";
-const STABLE = "stable";
-const CYCLE = "cycle";
+const EN_EVOLUTION = "en évolution", EXTINCTION = "extinction", STABLE = "stable", CYCLE = "cycle";
 
 class Jdlv {
-  static TAILLE_HISTORIQUE = 500;
   static TAILLE_MEMOIRE = 3000;
 
-  constructor(largeur = 70, hauteur = 50, torique = true, regle = "B3/S23") {
-    if (largeur < 3 || hauteur < 3) throw new Error("le tableau doit faire au moins 3x3");
+  constructor(largeur = 200, hauteur = 200, torique = true, regle = "B3/S23") {
+    if (!(largeur >= 3 && hauteur >= 3)) throw new Error("le damier doit faire au moins 3 × 3");
+    if (largeur * hauteur > MAX_CASES) throw new Error(`damier trop grand : ${largeur * hauteur} cases (maximum ${MAX_CASES})`);
     this.largeur = largeur;
     this.hauteur = hauteur;
     this.torique = torique;
     this.regle = new Regle(regle);
     this.tour = 0;
-    this.grille = [];                         // grille[y][x] : tableau 2D de Cellule
-    for (let y = 0; y < hauteur; y++) {
-      const ligne = [];
-      for (let x = 0; x < largeur; x++) ligne.push(new Cellule());
-      this.grille.push(ligne);
-    }
-    this._toutes_les_cellules = this.grille.flat();
-    this._relier_voisines();
+    const n = largeur * hauteur;
+    const taille = Math.ceil(n / 4) * 4;          // multiple de 4 pour la signature
+    this.grille = new Uint8Array(taille);         // Etat de la case (x, y) à l'indice y*largeur + x
+    this._suivant = new Uint8Array(taille);       // tampon du tour suivant (calcul en 2 étapes)
+    this.ages = new Uint8Array(n);                // tours consécutifs en vie (max 255)
+    this._population = 0;
+    // Historique limité à ~48 Mo : 500 tours pour 200×200, 12 pour 2 000×2 000
+    this.taille_historique = Math.max(10, Math.min(500, Math.floor(48e6 / n)));
     this.historique = [];
     this.populations = [0];
     this.deja_vus = new Map();
     this.statut = EN_EVOLUTION;
     this.periode = null;
+    this._signature = null;
   }
-
-  _relier_voisines() {
-    for (let y = 0; y < this.hauteur; y++) {
-      for (let x = 0; x < this.largeur; x++) {
-        const cellule = this.grille[y][x];
-        cellule.voisines = [];
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            let vx = x + dx;
-            let vy = y + dy;
-            if (this.torique) {
-              vx = (vx + this.largeur) % this.largeur;
-              vy = (vy + this.hauteur) % this.hauteur;
-            } else if (!this.est_dans_grille(vx, vy)) {
-              continue;
-            }
-            cellule.ajouter_voisine(this.grille[vy][vx]);
-          }
-        }
-      }
-    }
-  }
-  changer_torique(torique) { this.torique = torique; this._relier_voisines(); this._apres_modification(); }
-  changer_regle(notation) { this.regle = new Regle(notation); this._apres_modification(); }
 
   est_dans_grille(x, y) { return x >= 0 && x < this.largeur && y >= 0 && y < this.hauteur; }
-  get_cellule(x, y) { return this.grille[y][x]; }
-  cellules() { return this._toutes_les_cellules; }
-  population() {
+  get_etat(x, y) { return this.grille[y * this.largeur + x]; }
+  population() { return this._population; }
+  _recompter() {
     let total = 0;
-    for (const cellule of this._toutes_les_cellules) total += cellule.Etat;
-    return total;
+    const n = this.largeur * this.hauteur;
+    for (let i = 0; i < n; i++) total += this.grille[i];
+    this._population = total;
   }
+
+  changer_torique(torique) { this.torique = torique; this._apres_modification(); }
+  changer_regle(notation) { this.regle = new Regle(notation); this._apres_modification(); }
 
   _remettre_a_zero() {
     this.tour = 0;
     this.historique = [];
-    this.populations = [this.population()];
-    this.deja_vus = new Map();
-    this.statut = EN_EVOLUTION;
-    this.periode = null;
+    this.populations = [this._population];
+    this._apres_modification();
   }
   _apres_modification() {
     this.deja_vus = new Map();
     this.statut = EN_EVOLUTION;
     this.periode = null;
-    this.populations[this.populations.length - 1] = this.population();
+    this._signature = null;
+    this.populations[this.populations.length - 1] = this._population;
   }
-  vider() { for (const c of this._toutes_les_cellules) c.mourir(); this._remettre_a_zero(); }
+  vider() { this.grille.fill(0); this.ages.fill(0); this._population = 0; this._remettre_a_zero(); }
   remplir_aleatoirement(densite = 0.25) {
-    for (const c of this._toutes_les_cellules) { if (Math.random() < densite) c.naitre(); else c.mourir(); }
+    const n = this.largeur * this.hauteur;
+    let total = 0;
+    for (let i = 0; i < n; i++) {
+      const v = Math.random() < densite ? 1 : 0;
+      this.grille[i] = v; this.ages[i] = v; total += v;
+    }
+    this._population = total;
     this._remettre_a_zero();
   }
+  /** Rend la case vivante ou morte. Renvoie l'ancien [Etat, age] si elle a changé, sinon null. */
   modifier_cellule(x, y, vivante) {
-    const cellule = this.get_cellule(x, y);
-    if (vivante) cellule.naitre(); else cellule.mourir();
+    const i = y * this.largeur + x;
+    const ancien = [this.grille[i], this.ages[i]];
+    if (vivante && !this.grille[i]) { this.grille[i] = 1; this.ages[i] = 1; this._population++; }
+    else if (!vivante && this.grille[i]) { this.grille[i] = 0; this.ages[i] = 0; this._population--; }
+    else return null;
     this._apres_modification();
+    return ancien;
+  }
+  restaurer_case(i, etat, age) {
+    this._population += etat - this.grille[i];
+    this.grille[i] = etat; this.ages[i] = age;
   }
   placer_motif(motif, x, y) {
     for (const [dx, dy] of coordonnees_motif(motif)) {
-      let cx = x + dx;
-      let cy = y + dy;
-      if (this.torique) {
-        cx = ((cx % this.largeur) + this.largeur) % this.largeur;
-        cy = ((cy % this.hauteur) + this.hauteur) % this.hauteur;
+      let cx = x + dx, cy = y + dy;
+      if (this.torique) { cx = ((cx % this.largeur) + this.largeur) % this.largeur; cy = ((cy % this.hauteur) + this.hauteur) % this.hauteur; }
+      if (this.est_dans_grille(cx, cy)) {
+        const i = cy * this.largeur + cx;
+        if (!this.grille[i]) { this.grille[i] = 1; this.ages[i] = 1; this._population++; }
       }
-      if (this.est_dans_grille(cx, cy)) this.grille[cy][cx].naitre();
     }
     this._apres_modification();
   }
   charger_motif(motif, regle = null) {
     const nouvelle_regle = regle ? new Regle(regle) : this.regle;
-    const [largeur, hauteur] = motif.length ? dimensions_motif(motif) : [0, 0];
-    if (largeur > this.largeur || hauteur > this.hauteur) {
-      throw new Error(`motif trop grand (${largeur}x${hauteur}) pour un tableau de ${this.largeur}x${this.hauteur}`);
-    }
+    const [l, h] = motif.length ? dimensions_motif(motif) : [0, 0];
+    if (l > this.largeur || h > this.hauteur) throw new Error(`motif trop grand (${l}×${h}) pour un damier de ${this.largeur}×${this.hauteur}`);
     this.regle = nouvelle_regle;
     this.vider();
-    this.placer_motif(motif, Math.floor((this.largeur - largeur) / 2), Math.floor((this.hauteur - hauteur) / 2));
+    this.placer_motif(motif, Math.floor((this.largeur - l) / 2), Math.floor((this.hauteur - h) / 2));
     this._remettre_a_zero();
   }
-  motif_actuel() {
-    let xmin = Infinity, xmax = -1, ymin = Infinity, ymax = -1;
+  /** Nouveau damier de taille (largeur, hauteur) contenant les cellules de celui-ci, centrées. */
+  redimensionner(largeur, hauteur) {
+    const nouveau = new Jdlv(largeur, hauteur, this.torique, String(this.regle));
+    const dx = Math.floor((largeur - this.largeur) / 2);
+    const dy = Math.floor((hauteur - this.hauteur) / 2);
     for (let y = 0; y < this.hauteur; y++) {
+      const ny = y + dy;
+      if (ny < 0 || ny >= hauteur) continue;
       for (let x = 0; x < this.largeur; x++) {
-        if (this.grille[y][x].est_vivante()) {
-          xmin = Math.min(xmin, x); xmax = Math.max(xmax, x);
-          ymin = Math.min(ymin, y); ymax = Math.max(ymax, y);
-        }
+        const nx = x + dx;
+        if (nx < 0 || nx >= largeur) continue;
+        const i = y * this.largeur + x, j = ny * largeur + nx;
+        nouveau.grille[j] = this.grille[i];
+        nouveau.ages[j] = this.ages[i];
       }
+    }
+    nouveau._recompter();
+    nouveau._remettre_a_zero();
+    return nouveau;
+  }
+  motif_actuel() {
+    const W = this.largeur, H = this.hauteur, g = this.grille;
+    let xmin = W, xmax = -1, ymin = H, ymax = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y * W + x]) {
+      if (x < xmin) xmin = x; if (x > xmax) xmax = x; if (y < ymin) ymin = y; if (y > ymax) ymax = y;
     }
     if (xmax < 0) return [];
     const motif = [];
     for (let y = ymin; y <= ymax; y++) {
       let ligne = "";
-      for (let x = xmin; x <= xmax; x++) ligne += this.grille[y][x].est_vivante() ? "O" : ".";
+      for (let x = xmin; x <= xmax; x++) ligne += g[y * W + x] ? "O" : ".";
       motif.push(ligne);
     }
     return motif;
   }
 
-  // Deux étapes : toutes les cellules calculent, PUIS toutes appliquent.
+  /* Tour suivant, en deux étapes comme en Python : on écrit le nouvel état dans
+     un second tableau (_suivant), puis on échange les deux tableaux. Pour aller
+     vite, on fait glisser trois sommes de colonnes au lieu de relire 8 voisines. */
   tour_suivant() {
     this._memoriser_etat_actuel();
-    for (const c of this._toutes_les_cellules) c.calculer_etat_suivant(this.regle);
-    for (const c of this._toutes_les_cellules) c.passer_a_l_etat_suivant();
+    const W = this.largeur, H = this.hauteur, e = this.grille, s = this._suivant, a = this.ages;
+    const nais = this.regle._table_naissance, surv = this.regle._table_survie;
+    let pop = 0;
+    for (let y = 1; y < H - 1; y++) {
+      let i = y * W + 1;
+      const fin = y * W + W - 1;
+      let gauche = e[i - 1 - W] + e[i - 1] + e[i - 1 + W];
+      let milieu = e[i - W] + e[i] + e[i + W];
+      for (; i < fin; i++) {
+        const droite = e[i + 1 - W] + e[i + 1] + e[i + 1 + W];
+        const vivante = e[i];
+        const v = vivante ? surv[gauche + milieu + droite - 1] : nais[gauche + milieu + droite];
+        s[i] = v;
+        pop += v;
+        a[i] = v ? (a[i] < 255 ? a[i] + 1 : 255) : 0;
+        gauche = milieu;
+        milieu = droite;
+      }
+    }
+    pop += this._calculer_bords(e, s, a, nais, surv);
+    this.grille = s;
+    this._suivant = e;
+    this._population = pop;
+    this._signature = null;
     this.tour += 1;
-    this.populations.push(this.population());
+    this.populations.push(pop);
+    if (this.populations.length > 20000) this.populations.splice(0, 10000);
     this._analyser();
+  }
+  _calculer_bords(e, s, a, nais, surv) {
+    const W = this.largeur, H = this.hauteur, tore = this.torique;
+    let pop = 0;
+    const traiter = (x, y) => {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          let vx = x + dx, vy = y + dy;
+          if (tore) { vx = (vx + W) % W; vy = (vy + H) % H; }
+          else if (vx < 0 || vx >= W || vy < 0 || vy >= H) continue;
+          n += e[vy * W + vx];
+        }
+      }
+      const i = y * W + x;
+      const v = e[i] ? surv[n] : nais[n];
+      s[i] = v;
+      a[i] = v ? (a[i] < 255 ? a[i] + 1 : 255) : 0;
+      pop += v;
+    };
+    for (let x = 0; x < W; x++) { traiter(x, 0); traiter(x, H - 1); }
+    for (let y = 1; y < H - 1; y++) { traiter(0, y); traiter(W - 1, y); }
+    return pop;
   }
   tour_precedent() {
     if (this.historique.length === 0) return false;
     const photo = this.historique.pop();
-    this._toutes_les_cellules.forEach((cellule, i) => { cellule.age = photo[i]; cellule.Etat = photo[i] > 0 ? 1 : 0; });
+    this.ages.set(photo);
+    const n = this.largeur * this.hauteur;
+    for (let i = 0; i < n; i++) this.grille[i] = photo[i] > 0 ? 1 : 0;
+    this._recompter();
     this.tour -= 1;
     if (this.populations.length > 1) this.populations.pop();
     this._apres_modification();
     return true;
   }
 
-  // Équivalent du bytes() Python, compacté : 16 cellules par caractère.
+  /* Signature d'un état : empreinte de 64 bits (deux calculs de 32 bits)
+     au lieu de l'état complet, trop gros pour un damier immense. */
   signature() {
-    const c = this._toutes_les_cellules;
-    let texte = "";
-    for (let i = 0; i < c.length; i += 16) {
-      let code = 0;
-      for (let j = 0; j < 16 && i + j < c.length; j++) code |= c[i + j].Etat << j;
-      texte += String.fromCharCode(code);
+    if (this._signature !== null) return this._signature;
+    const mots = new Uint32Array(this.grille.buffer, 0, this.grille.length >> 2);
+    let h1 = 0x811c9dc5 ^ this.largeur, h2 = 0x27d4eb2f ^ this.hauteur;
+    for (let i = 0; i < mots.length; i++) {
+      const m = mots[i];
+      h1 = Math.imul(h1 ^ m, 0x9e3779b1); h1 = (h1 << 13) | (h1 >>> 19);
+      h2 = Math.imul(h2 ^ m, 0x85ebca77); h2 = (h2 << 17) | (h2 >>> 15);
     }
-    return texte;
+    this._signature = `${h1 >>> 0}:${h2 >>> 0}`;
+    return this._signature;
   }
   _memoriser_etat_actuel() {
-    const photo = new Uint8Array(this._toutes_les_cellules.length);
-    this._toutes_les_cellules.forEach((c, i) => { photo[i] = Math.min(c.age, 255); });
-    this.historique.push(photo);
-    if (this.historique.length > Jdlv.TAILLE_HISTORIQUE) this.historique.shift();
+    this.historique.push(this.ages.slice());
+    if (this.historique.length > this.taille_historique) this.historique.shift();
     if (this.deja_vus.size > Jdlv.TAILLE_MEMOIRE) this.deja_vus = new Map();
     const signature = this.signature();
     if (!this.deja_vus.has(signature)) this.deja_vus.set(signature, this.tour);
   }
   _analyser() {
     const signature = this.signature();
-    if (this.populations[this.populations.length - 1] === 0) {
-      this.statut = EXTINCTION; this.periode = null;
-    } else if (this.deja_vus.has(signature)) {
+    if (this._population === 0) { this.statut = EXTINCTION; this.periode = null; }
+    else if (this.deja_vus.has(signature)) {
       this.periode = this.tour - this.deja_vus.get(signature);
       this.statut = this.periode === 1 ? STABLE : CYCLE;
-    } else {
-      this.statut = EN_EVOLUTION; this.periode = null;
-    }
+    } else { this.statut = EN_EVOLUTION; this.periode = null; }
   }
   description_statut() {
     if (this.statut === EXTINCTION) return "Extinction";
@@ -586,12 +638,7 @@ class Jdlv {
     if (this.statut === CYCLE) return `Cycle de période ${this.periode}`;
     return "En évolution";
   }
-
-  start() {
-    const ihm = new Jdlv_IHM(this);
-    ihm.lancer();
-    return ihm;
-  }
+  start() { const ihm = new Jdlv_IHM(this); ihm.lancer(); return ihm; }
 }
 
 // ------------------------------------------------------------------ rle.py
@@ -606,9 +653,7 @@ function convertir_regle(texte) {
   return texte;
 }
 function lire_rle(texte) {
-  let largeur = 0;
-  let regle = null;
-  let donnees = "";
+  let largeur = 0, regle = null, donnees = "";
   for (let ligne of texte.split(/\r?\n/)) {
     ligne = ligne.trim();
     if (ligne === "" || ligne.startsWith("#")) continue;
@@ -618,24 +663,21 @@ function lire_rle(texte) {
         if (cle.toLowerCase() === "x") largeur = parseInt(valeur, 10) || 0;
         else if (cle.toLowerCase() === "rule") regle = convertir_regle(valeur);
       }
-    } else {
-      donnees += ligne;
-    }
+    } else donnees += ligne;
   }
   const motif = [];
-  let ligne = "";
-  let nombre = "";
-  for (const caractere of donnees) {
-    if (/\d/.test(caractere)) { nombre += caractere; continue; }
-    if (/\s/.test(caractere)) continue;
-    const repetitions = nombre ? parseInt(nombre, 10) : 1;
+  let ligne = "", nombre = "";
+  for (const c of donnees) {
+    if (/\d/.test(c)) { nombre += c; continue; }
+    if (/\s/.test(c)) continue;
+    const rep = nombre ? parseInt(nombre, 10) : 1;
     nombre = "";
-    if (repetitions > 5000) throw new Error("motif trop grand");
-    if (caractere === "b" || caractere === ".") ligne += ".".repeat(repetitions);
-    else if (caractere === "$") { motif.push(ligne); for (let i = 1; i < repetitions; i++) motif.push(""); ligne = ""; }
-    else if (caractere === "!") break;
-    else if (/[a-z]/i.test(caractere)) ligne += "O".repeat(repetitions);
-    else throw new Error(`caractère inattendu dans le RLE : « ${caractere} »`);
+    if (rep > 5000) throw new Error("motif trop grand");
+    if (c === "b" || c === ".") ligne += ".".repeat(rep);
+    else if (c === "$") { motif.push(ligne); for (let i = 1; i < rep; i++) motif.push(""); ligne = ""; }
+    else if (c === "!") break;
+    else if (/[a-z]/i.test(c)) ligne += "O".repeat(rep);
+    else throw new Error(`caractère inattendu dans le RLE : « ${c} »`);
   }
   motif.push(ligne);
   largeur = Math.max(largeur, ...motif.map((l) => l.length));
@@ -645,12 +687,12 @@ function lire_rle(texte) {
 function ecrire_rle(motif, regle = "B3/S23", nom = null) {
   const sequences = [];
   const ajouter = (symbole) => {
-    const derniere = sequences[sequences.length - 1];
-    if (derniere && derniere[1] === symbole) derniere[0] += 1; else sequences.push([1, symbole]);
+    const d = sequences[sequences.length - 1];
+    if (d && d[1] === symbole) d[0] += 1; else sequences.push([1, symbole]);
   };
   motif.forEach((ligne, numero) => {
     if (numero > 0) ajouter("$");
-    for (const caractere of ligne.replace(/\.+$/, "")) ajouter(caractere === "O" ? "o" : "b");
+    for (const c of ligne.replace(/\.+$/, "")) ajouter(c === "O" ? "o" : "b");
   });
   ajouter("!");
   const lignes = [];
@@ -662,41 +704,56 @@ function ecrire_rle(motif, regle = "B3/S23", nom = null) {
   }
   lignes.push(courante);
   const largeur = Math.max(0, ...motif.map((l) => l.length));
-  const entete = `x = ${largeur}, y = ${motif.length}, rule = ${regle}`;
-  return [...(nom ? [`#N ${nom}`] : []), entete, ...lignes].join("\n") + "\n";
+  return [...(nom ? [`#N ${nom}`] : []), `x = ${largeur}, y = ${motif.length}, rule = ${regle}`, ...lignes].join("\n") + "\n";
 }
 
 // ------------------------------------------------------------- jdlv_ihm.py
+const COULEUR_HORS = "#11111b";
 const COULEUR_FOND = "#1e1e2e";
 const COULEUR_LIGNES = "#2a2a3c";
 const COULEUR_VIVANTE = "#a6e3a1";
-const COULEURS_AGE = [[1, "#f9e2af"], [2, "#a6e3a1"], [4, "#94e2d5"], [9, "#89dceb"], [19, "#89b4fa"], [Infinity, "#cba6f7"]];
-const TAILLES = { grandes: 14, moyennes: 10, petites: 7 };
+const COULEURS_AGE = [[1, "#f9e2af"], [2, "#a6e3a1"], [4, "#94e2d5"], [9, "#89dceb"], [19, "#89b4fa"], [255, "#cba6f7"]];
+const ZOOM_MAX = 48;
 
-function couleur_selon_age(age) {
-  for (const [age_max, couleur] of COULEURS_AGE) if (age <= age_max) return couleur;
-  return COULEURS_AGE[COULEURS_AGE.length - 1][1];
+/** "#rrggbb" -> entier 32 bits du pixel (ordre des octets d'ImageData : R, G, B, A). */
+function pixel(hex) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+}
+// Tables âge -> couleur du pixel (âge 0 = case morte)
+const PALETTE_AGE = new Uint32Array(256);
+const PALETTE_SIMPLE = new Uint32Array(256);
+for (let age = 0; age < 256; age++) {
+  let couleur = COULEUR_FOND;
+  if (age > 0) couleur = COULEURS_AGE.find(([age_max]) => age <= age_max)[1];
+  PALETTE_AGE[age] = pixel(couleur);
+  PALETTE_SIMPLE[age] = pixel(age > 0 ? COULEUR_VIVANTE : COULEUR_FOND);
 }
 
 class Jdlv_IHM {
   constructor(jeu) {
     this.jeu = jeu;
+    this.$ = (id) => document.getElementById(id);
     this.en_cours = false;
     this.id_minuteur = null;
-    this.mode_dessin = true;
-    this.outil = "pinceau";          // "pinceau" ou "motif"
-    this.appui = null;               // dernière case touchée pendant un glisser
-    this.taille = 10;
-    this.$ = (id) => document.getElementById(id);
+    this.outil = "dessin";              // "dessin", "deplacement" ou "motif"
+    this.zoom = 4;                      // taille d'une case, en pixels
+    this.ox = 0;                        // position à l'écran du coin haut-gauche du damier
+    this.oy = 0;
+    this.pointeurs = new Map();
+    this.geste = null;
+    this.trait = null;                  // cases modifiées par le doigt en cours (pour annuler)
     this.canevas = this.$("tableau");
     this.ctx = this.canevas.getContext("2d");
+    this.image = document.createElement("canvas");   // 1 pixel = 1 case
+    this.image_ctx = this.image.getContext("2d");
     this.courbe = this.$("courbe");
     this._dessin_prevu = false;
     this._remplir_listes();
     this._associer_evenements();
   }
 
-  // ---------------------------------------------------- construction
+  // ------------------------------------------------------------ interface
   _remplir_listes() {
     const regles = this.$("regle");
     for (const [nom, notation] of Object.entries(REGLES)) regles.add(new Option(`${nom} — ${notation}`, notation));
@@ -716,115 +773,183 @@ class Jdlv_IHM {
     clic("b-reglages", () => this.ouvrir_panneau(true));
     clic("b-fermer", () => this.ouvrir_panneau(false));
     this.$("voile").addEventListener("click", () => this.ouvrir_panneau(false));
+    clic("o-dessin", () => this.choisir_outil("dessin"));
+    clic("o-deplacement", () => this.choisir_outil("deplacement"));
+    clic("o-plus", () => this.zoomer_autour(this.canevas.clientWidth / 2, this.canevas.clientHeight / 2, 1.6));
+    clic("o-moins", () => this.zoomer_autour(this.canevas.clientWidth / 2, this.canevas.clientHeight / 2, 1 / 1.6));
+    clic("o-tout", () => { this.voir_tout(); this.dessiner(); });
     clic("b-regle", () => this.appliquer_regle(this.$("regle-perso").value));
     this.$("regle-perso").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.appliquer_regle(e.target.value); } });
     this.$("regle").addEventListener("change", (e) => {
-      if (e.target.value === "autre") this.$("regle-perso").focus();
-      else this.appliquer_regle(e.target.value);
+      if (e.target.value === "autre") this.$("regle-perso").focus(); else this.appliquer_regle(e.target.value);
     });
-    clic("b-motif-centre", () => { this.placer_motif(Math.floor(this.jeu.largeur / 2), Math.floor(this.jeu.hauteur / 2)); this.ouvrir_panneau(false); });
+    this.$("taille-damier").addEventListener("change", (e) => {
+      this.$("taille-perso").hidden = e.target.value !== "perso";
+      if (e.target.value !== "perso") this.appliquer_taille();
+    });
+    clic("b-taille", () => this.appliquer_taille());
+    clic("b-motif-centre", () => {
+      const [x, y] = this._case_ecran(this.canevas.clientWidth / 2, this.canevas.clientHeight / 2);
+      this.placer_motif(Math.min(Math.max(x, 0), this.jeu.largeur - 1), Math.min(Math.max(y, 0), this.jeu.hauteur - 1));
+      this.ouvrir_panneau(false);
+    });
     clic("b-motif-toucher", () => { this.choisir_outil("motif"); this.ouvrir_panneau(false); });
-    clic("mode-motif-fin", () => this.choisir_outil("pinceau"));
+    clic("mode-motif-fin", () => this.choisir_outil("dessin"));
     this.$("motif").addEventListener("change", () => this._texte_mode_motif());
     this.$("vitesse").addEventListener("input", (e) => { this.$("vitesse-valeur").textContent = `${e.target.value} t/s`; });
     this.$("torique").addEventListener("change", (e) => { this.jeu.changer_torique(e.target.checked); this.dessiner(); });
     this.$("couleur-age").addEventListener("change", () => this.dessiner());
-    this.$("taille").addEventListener("change", () => this.dimensionner(true));
     clic("b-rle-charger", () => this.charger_rle(this.$("rle").value));
     clic("b-rle-copier", () => this.copier_rle());
     this.$("rle-fichier").addEventListener("change", (e) => this.ouvrir_fichier(e.target.files[0]));
 
-    this.canevas.addEventListener("pointerdown", (e) => this._toucher(e));
-    this.canevas.addEventListener("pointermove", (e) => this._glisser(e));
-    for (const fin of ["pointerup", "pointercancel", "lostpointercapture"]) {
-      this.canevas.addEventListener(fin, () => { this.appui = null; });
-    }
+    const c = this.canevas;
+    c.addEventListener("pointerdown", (e) => this._pointeur_bas(e));
+    c.addEventListener("pointermove", (e) => this._pointeur_bouge(e));
+    for (const fin of ["pointerup", "pointercancel"]) c.addEventListener(fin, (e) => this._pointeur_haut(e));
+    c.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const [px, py] = this._position(e);
+      this.zoomer_autour(px, py, Math.exp(-e.deltaY * 0.0015));
+    }, { passive: false });
+    c.addEventListener("contextmenu", (e) => e.preventDefault());
     document.addEventListener("keydown", (e) => this._clavier(e));
     let attente = null;
-    new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(() => this.dimensionner(false), 120); }).observe(this.$("scene"));
+    new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(() => this._adapter_canevas(), 100); }).observe(this.$("scene"));
   }
 
-  // ------------------------------------------- taille du tableau à l'écran
-  static dimensions_pour(scene, choix) {
-    const largeur = scene.clientWidth;
-    const hauteur = scene.clientHeight;
-    let taille = TAILLES[choix] || 10;
-    if (choix === "moyennes") taille = Math.max(6, Math.min(10, Math.floor(largeur / 40)));
-    return {
-      taille,
-      colonnes: Math.max(10, Math.floor(largeur / taille)),
-      lignes: Math.max(10, Math.floor(hauteur / taille)),
-    };
+  // ------------------------------------------------------ taille du damier
+  static taille_ecran(scene) {
+    return [Math.max(10, Math.floor(scene.clientWidth / 10)), Math.max(10, Math.floor(scene.clientHeight / 10))];
   }
-  dimensionner(force) {
-    const d = Jdlv_IHM.dimensions_pour(this.$("scene"), this.$("taille").value);
-    const change = d.colonnes !== this.jeu.largeur || d.lignes !== this.jeu.hauteur;
-    if (change) {
-      // Nouveau tableau aux nouvelles dimensions : on y recopie les cellules vivantes.
-      const motif = this.jeu.motif_actuel();
-      const ancien = this.jeu;
-      this.jeu = new Jdlv(d.colonnes, d.lignes, ancien.torique, String(ancien.regle));
-      if (motif.length) {
-        try { this.jeu.charger_motif(motif); }
-        catch { this.jeu.placer_motif(motif, 0, 0); this.jeu._remettre_a_zero(); }
+  appliquer_taille() {
+    const choix = this.$("taille-damier").value;
+    let largeur, hauteur;
+    if (choix === "ecran") [largeur, hauteur] = Jdlv_IHM.taille_ecran(this.$("scene"));
+    else if (choix === "perso") {
+      largeur = Math.round(Number(this.$("perso-largeur").value));
+      hauteur = Math.round(Number(this.$("perso-hauteur").value));
+      if (!(largeur >= 10 && hauteur >= 10 && largeur <= 4000 && hauteur <= 4000)) {
+        this.message("Largeur et hauteur : entre 10 et 4 000.", true); return;
       }
+    } else [largeur, hauteur] = choix.split("x").map(Number);
+    if (largeur * hauteur > MAX_CASES) {
+      this.message(`${(largeur * hauteur).toLocaleString("fr-FR")} cases : c'est trop pour un téléphone (maximum 9 millions).`, true);
+      return;
     }
-    if (change || force || d.taille !== this.taille) {
-      this.taille = d.taille;
-      const ratio = window.devicePixelRatio || 1;
-      const l = this.jeu.largeur * this.taille;
-      const h = this.jeu.hauteur * this.taille;
-      this.canevas.style.width = `${l}px`;
-      this.canevas.style.height = `${h}px`;
-      this.canevas.width = Math.round(l * ratio);
-      this.canevas.height = Math.round(h * ratio);
-      this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    this.arreter();
+    try { this.jeu = this.jeu.redimensionner(largeur, hauteur); }
+    catch (erreur) { this.message(erreur.message, true); return; }
+    this._preparer_image();
+    this.voir_tout();
+    this.dessiner();
+    this.message(`Damier ${largeur.toLocaleString("fr-FR")} × ${hauteur.toLocaleString("fr-FR")}.`);
+  }
+  _info_taille() {
+    const { largeur: l, hauteur: h } = this.jeu;
+    const fr = (n) => n.toLocaleString("fr-FR");
+    this.$("stat-taille").textContent = `${l}×${h}`;
+    this.$("taille-info").textContent = `${fr(l)} × ${fr(h)} = ${fr(l * h)} cases · retour arrière sur ${this.jeu.taille_historique} tours.`;
+  }
+
+  // ------------------------------------------------------- caméra (zoom)
+  _adapter_canevas() {
+    const ratio = window.devicePixelRatio || 1;
+    const l = this.canevas.clientWidth, h = this.canevas.clientHeight;
+    if (!l || !h) return;
+    const premier = !this._taille_vue;
+    if (!premier) {   // garder le même point du damier au centre
+      this.ox += (l - this._taille_vue[0]) / 2;
+      this.oy += (h - this._taille_vue[1]) / 2;
     }
+    this._taille_vue = [l, h];
+    this.canevas.width = Math.round(l * ratio);
+    this.canevas.height = Math.round(h * ratio);
+    if (premier) this.voir_tout(); else this._borner();
     this.dessiner();
   }
+  _zoom_min() {
+    const [l, h] = this._taille_vue || [300, 300];
+    return Math.min(1, 0.9 * Math.min(l / this.jeu.largeur, h / this.jeu.hauteur));
+  }
+  voir_tout() {
+    const [l, h] = this._taille_vue || [300, 300];
+    this.zoom = Math.min(ZOOM_MAX, 0.98 * Math.min(l / this.jeu.largeur, h / this.jeu.hauteur));
+    this.ox = (l - this.jeu.largeur * this.zoom) / 2;
+    this.oy = (h - this.jeu.hauteur * this.zoom) / 2;
+  }
+  zoomer_autour(px, py, facteur) {
+    const z = Math.min(ZOOM_MAX, Math.max(this._zoom_min(), this.zoom * facteur));
+    const wx = (px - this.ox) / this.zoom, wy = (py - this.oy) / this.zoom;   // case sous le point
+    this.zoom = z;
+    this.ox = px - wx * z;
+    this.oy = py - wy * z;
+    this._borner();
+    this.demander_dessin();
+  }
+  _borner() {   // le damier ne doit pas sortir complètement de l'écran
+    const [l, h] = this._taille_vue || [300, 300];
+    const marge = 40;
+    this.ox = Math.min(l - marge, Math.max(marge - this.jeu.largeur * this.zoom, this.ox));
+    this.oy = Math.min(h - marge, Math.max(marge - this.jeu.hauteur * this.zoom, this.oy));
+  }
+  _case_ecran(px, py) { return [Math.floor((px - this.ox) / this.zoom), Math.floor((py - this.oy) / this.zoom)]; }
 
-  // ---------------------------------------------------------- affichage
+  // ------------------------------------------------------------ affichage
+  _preparer_image() {
+    this.image.width = this.jeu.largeur;
+    this.image.height = this.jeu.hauteur;
+    this.pixels = this.image_ctx.createImageData(this.jeu.largeur, this.jeu.hauteur);
+    this.pixels32 = new Uint32Array(this.pixels.data.buffer);
+    this._info_taille();
+  }
   demander_dessin() {
     if (this._dessin_prevu) return;
     this._dessin_prevu = true;
     requestAnimationFrame(() => { this._dessin_prevu = false; this.dessiner(); });
   }
   dessiner() {
-    const { ctx, taille: t, jeu } = this;
-    ctx.fillStyle = COULEUR_FOND;
-    ctx.fillRect(0, 0, jeu.largeur * t, jeu.hauteur * t);
-    if (t >= 6) {
+    if (!this._taille_vue) return;
+    const jeu = this.jeu;
+    // 1. Une case = un pixel de l'image hors écran
+    const palette = this.$("couleur-age").checked ? PALETTE_AGE : PALETTE_SIMPLE;
+    const p = this.pixels32, a = jeu.ages, n = jeu.largeur * jeu.hauteur;
+    for (let i = 0; i < n; i++) p[i] = palette[a[i]];
+    this.image_ctx.putImageData(this.pixels, 0, 0);
+    // 2. On agrandit l'image à l'écran selon le zoom
+    const ratio = window.devicePixelRatio || 1;
+    const [l, h] = this._taille_vue;
+    const ctx = this.ctx, z = this.zoom;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.fillStyle = COULEUR_HORS;
+    ctx.fillRect(0, 0, l, h);
+    ctx.imageSmoothingEnabled = z < 1;
+    ctx.drawImage(this.image, this.ox, this.oy, jeu.largeur * z, jeu.hauteur * z);
+    // 3. Quadrillage seulement quand les cases sont assez grandes
+    if (z >= 6) {
+      const x0 = Math.max(0, Math.floor(-this.ox / z)), x1 = Math.min(jeu.largeur, Math.ceil((l - this.ox) / z));
+      const y0 = Math.max(0, Math.floor(-this.oy / z)), y1 = Math.min(jeu.hauteur, Math.ceil((h - this.oy) / z));
       ctx.strokeStyle = COULEUR_LIGNES;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let x = 1; x < jeu.largeur; x++) { ctx.moveTo(x * t + 0.5, 0); ctx.lineTo(x * t + 0.5, jeu.hauteur * t); }
-      for (let y = 1; y < jeu.hauteur; y++) { ctx.moveTo(0, y * t + 0.5); ctx.lineTo(jeu.largeur * t, y * t + 0.5); }
+      for (let x = x0; x <= x1; x++) { const sx = Math.round(this.ox + x * z) + 0.5; ctx.moveTo(sx, this.oy + y0 * z); ctx.lineTo(sx, this.oy + y1 * z); }
+      for (let y = y0; y <= y1; y++) { const sy = Math.round(this.oy + y * z) + 0.5; ctx.moveTo(this.ox + x0 * z, sy); ctx.lineTo(this.ox + x1 * z, sy); }
       ctx.stroke();
     }
-    const age = this.$("couleur-age").checked;
-    const marge = t >= 6 ? 1 : 0;
-    for (let y = 0; y < jeu.hauteur; y++) {
-      const ligne = jeu.grille[y];
-      for (let x = 0; x < jeu.largeur; x++) {
-        const c = ligne[x];
-        if (c.Etat === VIVANTE) {
-          ctx.fillStyle = age ? couleur_selon_age(c.age) : COULEUR_VIVANTE;
-          ctx.fillRect(x * t + marge, y * t + marge, t - marge, t - marge);
-        }
-      }
-    }
-    this.$("stat-tour").textContent = jeu.tour;
-    this.$("stat-pop").textContent = jeu.populations[jeu.populations.length - 1];
+    ctx.strokeStyle = "#3a3a52";
+    ctx.strokeRect(Math.round(this.ox) - 0.5, Math.round(this.oy) - 0.5, Math.round(jeu.largeur * z) + 1, Math.round(jeu.hauteur * z) + 1);
+    // 4. Textes
+    this.$("echelle").textContent = z >= 1 ? `case ${z.toFixed(z < 10 ? 1 : 0)} px` : `1 px = ${(1 / z).toFixed(1)} cases`;
+    this.$("stat-tour").textContent = jeu.tour.toLocaleString("fr-FR");
+    this.$("stat-pop").textContent = jeu.population().toLocaleString("fr-FR");
     const puce = this.$("stat-statut");
     puce.textContent = jeu.description_statut();
     puce.className = "puce" + (jeu.statut === EXTINCTION ? " fin" : jeu.statut === EN_EVOLUTION ? "" : " alerte");
     this.dessiner_courbe();
   }
   dessiner_courbe() {
-    const c = this.courbe;
-    const ratio = window.devicePixelRatio || 1;
-    const l = c.clientWidth;
-    const h = c.clientHeight;
+    const c = this.courbe, ratio = window.devicePixelRatio || 1;
+    const l = c.clientWidth, h = c.clientHeight;
     if (!l || !h) return;
     if (c.width !== Math.round(l * ratio)) { c.width = Math.round(l * ratio); c.height = Math.round(h * ratio); }
     const ctx = c.getContext("2d");
@@ -832,23 +957,19 @@ class Jdlv_IHM {
     ctx.clearRect(0, 0, l, h);
     const valeurs = this.jeu.populations.slice(-Math.floor(l / 2));
     const maximum = Math.max(1, ...valeurs);
-    this.$("courbe-legende").textContent = `Population · max ${maximum}`;
+    this.$("courbe-legende").textContent = `Population · max ${maximum.toLocaleString("fr-FR")}`;
     if (valeurs.length < 2) return;
-    const point = (i, v) => [i * 2, h - 4 - (v * (h - 20)) / maximum];
+    const point = (i, v) => [i * 2, h - 3 - (v * (h - 18)) / maximum];
     ctx.beginPath();
     valeurs.forEach((v, i) => { const [x, y] = point(i, v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
     const [dx, dy] = point(valeurs.length - 1, valeurs[valeurs.length - 1]);
-    ctx.strokeStyle = "#89b4fa";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeStyle = "#89b4fa"; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.lineTo(dx, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = "rgba(137, 180, 250, 0.12)";
-    ctx.fill();
-    ctx.fillStyle = "#89b4fa";
-    ctx.beginPath(); ctx.arc(dx, dy, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(137, 180, 250, 0.12)"; ctx.fill();
+    ctx.fillStyle = "#89b4fa"; ctx.beginPath(); ctx.arc(dx, dy, 2.5, 0, Math.PI * 2); ctx.fill();
   }
 
-  // ---------------------------------------------------------- animation
+  // ------------------------------------------------------------ animation
   etape() { this.jeu.tour_suivant(); this.dessiner(); }
   basculer_lecture() { if (this.en_cours) this.arreter(); else this.demarrer(); }
   demarrer() {
@@ -864,15 +985,16 @@ class Jdlv_IHM {
     this.$("texte-lecture").textContent = "Lecture";
     this.$("icone-lecture").innerHTML = '<path d="M7 4.5v15L19.5 12z"/>';
   }
-  // Comme after() en Tkinter : on calcule un tour puis on se reprogramme.
-  _boucle() {
+  _boucle() {   // comme after() en Tkinter
+    const debut = performance.now();
     this.etape();
     if (this.$("pause-auto").checked && this.jeu.statut !== EN_EVOLUTION) {
       this.arreter();
       this.message(`${this.jeu.description_statut()} au tour ${this.jeu.tour} : animation en pause.`);
       return;
     }
-    this.id_minuteur = setTimeout(() => this._boucle(), 1000 / Number(this.$("vitesse").value));
+    const delai = 1000 / Number(this.$("vitesse").value) - (performance.now() - debut);
+    this.id_minuteur = setTimeout(() => this._boucle(), Math.max(0, delai));
   }
   retour_arriere() {
     this.arreter();
@@ -880,7 +1002,7 @@ class Jdlv_IHM {
     else this.message("Plus d'historique : impossible de remonter plus loin.");
   }
 
-  // ------------------------------------------------------------ actions
+  // -------------------------------------------------------------- actions
   _afficher_regle() {
     const notation = String(this.jeu.regle);
     const liste = this.$("regle");
@@ -888,25 +1010,33 @@ class Jdlv_IHM {
     if (liste.value === "autre") this.$("regle-perso").value = notation;
   }
   appliquer_regle(notation) {
-    try {
-      this.jeu.changer_regle(notation);
-      this.message(`Règle ${this.jeu.regle} appliquée.`);
-    } catch (erreur) {
-      this.message(erreur.message, true);
-    }
+    try { this.jeu.changer_regle(notation); this.message(`Règle ${this.jeu.regle} appliquée.`); }
+    catch (erreur) { this.message(erreur.message, true); }
     this._afficher_regle();
     this.dessiner();
   }
   placer_motif(x, y) {
     const nom = this.$("motif").value;
-    if (EXEMPLES_RLE[nom]) { this.charger_rle(EXEMPLES_RLE[nom]); return; }
-    const motif = MOTIFS[nom];
-    const [l, h] = dimensions_motif(motif);
-    this.jeu.placer_motif(motif, x - Math.floor(l / 2), y - Math.floor(h / 2));
+    if (EXEMPLES_RLE[nom]) {
+      try {
+        const [motif, regle] = lire_rle(EXEMPLES_RLE[nom]);
+        this.jeu.changer_regle(regle);
+        this.jeu.placer_motif(motif, x - Math.floor(motif[0].length / 2), y - Math.floor(motif.length / 2));
+        this._afficher_regle();
+        this.message(`Règle passée en ${regle} pour ce motif.`);
+      } catch (erreur) { this.message(erreur.message, true); }
+    } else {
+      const motif = MOTIFS[nom];
+      const [l, h] = dimensions_motif(motif);
+      this.jeu.placer_motif(motif, x - Math.floor(l / 2), y - Math.floor(h / 2));
+    }
     this.dessiner();
   }
   choisir_outil(outil) {
     this.outil = outil;
+    this.$("o-dessin").setAttribute("aria-pressed", String(outil === "dessin"));
+    this.$("o-deplacement").setAttribute("aria-pressed", String(outil === "deplacement"));
+    this.canevas.className = outil === "deplacement" ? "deplacement" : "dessin";
     this.$("mode-motif").hidden = outil !== "motif";
     this._texte_mode_motif();
   }
@@ -917,12 +1047,11 @@ class Jdlv_IHM {
       this.arreter();
       this.jeu.charger_motif(motif, regle);
       this._afficher_regle();
+      this.voir_tout();
       this.dessiner();
       this.ouvrir_panneau(false);
       this.message(`Motif chargé (${motif[0].length}×${motif.length}), règle ${this.jeu.regle}.`);
-    } catch (erreur) {
-      this.message(`Impossible de charger ce motif : ${erreur.message}`, true);
-    }
+    } catch (erreur) { this.message(`Impossible de charger ce motif : ${erreur.message}`, true); }
   }
   ouvrir_fichier(fichier) {
     if (!fichier) return;
@@ -932,15 +1061,14 @@ class Jdlv_IHM {
     lecteur.readAsText(fichier);
   }
   copier_rle() {
+    if (this.jeu.population() > 200000) { this.message("Trop de cellules pour un texte RLE lisible (plus de 200 000).", true); return; }
     const motif = this.jeu.motif_actuel();
-    if (!motif.length) { this.message("Le tableau est vide : rien à copier.", true); return; }
+    if (!motif.length) { this.message("Le damier est vide : rien à copier.", true); return; }
     const texte = ecrire_rle(motif, String(this.jeu.regle), "Mon motif");
     const zone = this.$("rle");
     zone.value = texte;
     const repli = () => { zone.focus(); zone.select(); this.message("Texte RLE sélectionné : copiez-le avec le menu."); };
-    try {
-      navigator.clipboard.writeText(texte).then(() => this.message("Texte RLE copié."), repli);
-    } catch { repli(); }
+    try { navigator.clipboard.writeText(texte).then(() => this.message("Texte RLE copié."), repli); } catch { repli(); }
   }
   ouvrir_panneau(ouvert) {
     this.$("panneau").classList.toggle("ouvert", ouvert);
@@ -953,53 +1081,119 @@ class Jdlv_IHM {
     toast.classList.toggle("erreur", erreur);
     toast.hidden = false;
     clearTimeout(this._minuteur_toast);
-    this._minuteur_toast = setTimeout(() => { toast.hidden = true; }, 2600);
+    this._minuteur_toast = setTimeout(() => { toast.hidden = true; }, 2800);
   }
 
-  // ------------------------------------------------------ doigt / souris
-  _case(e) {
-    const r = this.canevas.getBoundingClientRect();
-    return [Math.floor((e.clientX - r.left) / this.taille), Math.floor((e.clientY - r.top) / this.taille)];
-  }
-  _toucher(e) {
-    const [x, y] = this._case(e);
-    if (!this.jeu.est_dans_grille(x, y)) return;
+  // ------------------------------------------------- doigts, souris, clavier
+  _position(e) { const r = this.canevas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  _pointeur_bas(e) {
+    const [px, py] = this._position(e);
+    try { this.canevas.setPointerCapture(e.pointerId); } catch { /* pointeur déjà relâché */ }
+    this.pointeurs.set(e.pointerId, [px, py]);
+    if (this.pointeurs.size === 2) { this._annuler_trait(); this._debut_pincement(); return; }
+    if (this.pointeurs.size > 2) return;
     e.preventDefault();
-    if (this.outil === "motif") { this.placer_motif(x, y); return; }
-    this.canevas.setPointerCapture(e.pointerId);
-    this.mode_dessin = !this.jeu.get_cellule(x, y).est_vivante();
-    this.jeu.modifier_cellule(x, y, this.mode_dessin);
-    this.appui = [x, y];
+    const deplacer = this.outil === "deplacement" || e.button === 1 || e.button === 2 || e.shiftKey;
+    if (deplacer) { this.geste = { type: "deplacement", px, py, ox: this.ox, oy: this.oy }; return; }
+    if (this.outil === "motif") { this.geste = { type: "tape", px, py, ox: this.ox, oy: this.oy, bouge: false }; return; }
+    const [x, y] = this._case_ecran(px, py);
+    if (!this.jeu.est_dans_grille(x, y)) { this.geste = { type: "deplacement", px, py, ox: this.ox, oy: this.oy }; return; }
+    this.trait = { vivante: !this.jeu.get_etat(x, y), cases: [] };
+    this._peindre(x, y);
+    this.geste = { type: "dessin", derniere: [x, y] };
     this.demander_dessin();
   }
-  _glisser(e) {
-    if (!this.appui) return;
-    const [x, y] = this._case(e);
-    let [x0, y0] = this.appui;
-    // Trace toutes les cases entre le point précédent et le nouveau (doigt rapide)
-    const pas = Math.max(Math.abs(x - x0), Math.abs(y - y0));
-    for (let i = 1; i <= pas; i++) {
-      const cx = Math.round(x0 + ((x - x0) * i) / pas);
-      const cy = Math.round(y0 + ((y - y0) * i) / pas);
-      if (this.jeu.est_dans_grille(cx, cy)) this.jeu.modifier_cellule(cx, cy, this.mode_dessin);
+  _pointeur_bouge(e) {
+    if (!this.pointeurs.has(e.pointerId)) return;
+    const [px, py] = this._position(e);
+    this.pointeurs.set(e.pointerId, [px, py]);
+    const g = this.geste;
+    if (!g) return;
+    if (g.type === "pincement") { this._pincer(); return; }
+    if (g.type === "deplacement" || g.type === "tape") {
+      if (g.type === "tape" && Math.hypot(px - g.px, py - g.py) < 10) return;
+      if (g.type === "tape") g.bouge = true;
+      this.ox = g.ox + px - g.px;
+      this.oy = g.oy + py - g.py;
+      this._borner();
+      this.demander_dessin();
+      return;
     }
-    this.appui = [x, y];
-    if (pas) this.demander_dessin();
+    if (g.type === "dessin") {
+      const [x, y] = this._case_ecran(px, py);
+      const [x0, y0] = g.derniere;
+      const pas = Math.max(Math.abs(x - x0), Math.abs(y - y0));
+      for (let i = 1; i <= pas; i++) {   // toutes les cases entre deux positions du doigt
+        const cx = Math.round(x0 + ((x - x0) * i) / pas), cy = Math.round(y0 + ((y - y0) * i) / pas);
+        if (this.jeu.est_dans_grille(cx, cy)) this._peindre(cx, cy);
+      }
+      g.derniere = [x, y];
+      if (pas) this.demander_dessin();
+    }
+  }
+  _pointeur_haut(e) {
+    const g = this.geste;
+    if (g && g.type === "tape" && !g.bouge && this.pointeurs.size === 1) {
+      const [x, y] = this._case_ecran(g.px, g.py);
+      if (this.jeu.est_dans_grille(x, y)) this.placer_motif(x, y);
+    }
+    this.pointeurs.delete(e.pointerId);
+    if (this.pointeurs.size === 1 && g && g.type === "pincement") {
+      // Il reste un doigt après un pincement : il continue à déplacer, sans dessiner
+      const [px, py] = [...this.pointeurs.values()][0];
+      this.geste = { type: "deplacement", px, py, ox: this.ox, oy: this.oy };
+    } else if (this.pointeurs.size === 0) {
+      this.geste = null;
+      this.trait = null;
+    }
+  }
+  _peindre(x, y) {
+    const ancien = this.jeu.modifier_cellule(x, y, this.trait.vivante);
+    if (ancien) this.trait.cases.push([y * this.jeu.largeur + x, ...ancien]);
+  }
+  _annuler_trait() {   // le 1er doigt a commencé à dessiner : un 2e doigt arrive, c'était un zoom
+    if (this.trait) {
+      for (const [i, etat, age] of this.trait.cases.reverse()) this.jeu.restaurer_case(i, etat, age);
+      this.jeu._apres_modification();
+      this.trait = null;
+    }
+  }
+  _debut_pincement() {
+    const [[x1, y1], [x2, y2]] = [...this.pointeurs.values()];
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    this.geste = {
+      type: "pincement", d0: Math.max(10, Math.hypot(x2 - x1, y2 - y1)), z0: this.zoom,
+      wx: (mx - this.ox) / this.zoom, wy: (my - this.oy) / this.zoom,
+    };
+  }
+  _pincer() {
+    const g = this.geste;
+    const [[x1, y1], [x2, y2]] = [...this.pointeurs.values()];
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    // La case qui était sous le milieu des deux doigts y reste
+    this.zoom = Math.min(ZOOM_MAX, Math.max(this._zoom_min(), g.z0 * Math.hypot(x2 - x1, y2 - y1) / g.d0));
+    this.ox = mx - g.wx * this.zoom;
+    this.oy = my - g.wy * this.zoom;
+    this._borner();
+    this.demander_dessin();
   }
   _clavier(e) {
     if (e.target.closest("input, textarea, select")) return;
     if (e.key === " ") { e.preventDefault(); this.basculer_lecture(); }
     else if (e.key === "Enter") { e.preventDefault(); this.arreter(); this.etape(); }
     else if (e.key === "Backspace") { e.preventDefault(); this.retour_arriere(); }
-    else if (e.key === "Escape") { this.ouvrir_panneau(false); this.choisir_outil("pinceau"); }
+    else if (e.key === "+" || e.key === "=") this.zoomer_autour(this.canevas.clientWidth / 2, this.canevas.clientHeight / 2, 1.6);
+    else if (e.key === "-") this.zoomer_autour(this.canevas.clientWidth / 2, this.canevas.clientHeight / 2, 1 / 1.6);
+    else if (e.key === "Escape") { this.ouvrir_panneau(false); this.choisir_outil("dessin"); }
   }
 
   lancer() {
-    this.dimensionner(true);
+    this._preparer_image();
+    this._adapter_canevas();
     try {
       window.claude?.hot?.snapshot?.(() => ({
-        rle: this.jeu.motif_actuel().length ? ecrire_rle(this.jeu.motif_actuel(), String(this.jeu.regle)) : "",
-        torique: this.jeu.torique,
+        taille: [this.jeu.largeur, this.jeu.hauteur],
+        rle: this.jeu.population() && this.jeu.population() < 20000 ? ecrire_rle(this.jeu.motif_actuel(), String(this.jeu.regle)) : "",
       }));
     } catch { /* hors du lecteur d'artifacts */ }
   }
@@ -1007,19 +1201,20 @@ class Jdlv_IHM {
 
 // ------------------------------------------------------------------ main.py
 function start(donnees = {}) {
-  const scene = document.getElementById("scene");
-  const d = Jdlv_IHM.dimensions_pour(scene, document.getElementById("taille").value);
-  const jeu = new Jdlv(d.colonnes, d.lignes, Boolean(donnees.torique));
+  const [largeur, hauteur] = Array.isArray(donnees.taille) ? donnees.taille : [200, 200];
+  const jeu = new Jdlv(largeur, hauteur, true);
   if (donnees.rle) {
-    try { const [motif, regle] = lire_rle(donnees.rle); jeu.charger_motif(motif, regle); } catch { /* on repart du canon */ }
+    try { const [motif, regle] = lire_rle(donnees.rle); jeu.charger_motif(motif, regle); } catch { /* départ par défaut */ }
   }
   if (jeu.population() === 0) {
-    // Configuration de départ : le canon de Gosper, un pulsar, puis 60 tours
-    jeu.placer_motif(MOTIFS["Canon de Gosper"], 1, 1);
-    if (jeu.hauteur >= 34) jeu.placer_motif(MOTIFS["Pulsar"], 2, jeu.hauteur - 15);
+    // Départ : une soupe aléatoire au centre, un canon de Gosper et un gland
+    for (let y = 60; y < 140; y++) for (let x = 60; x < 140; x++) if (Math.random() < 0.35) jeu.modifier_cellule(x, y, true);
+    jeu.placer_motif(MOTIFS["Canon de Gosper"], 6, 6);
+    jeu.placer_motif(MOTIFS["Gland (5 206 tours)"], 160, 170);
     jeu._remettre_a_zero();
-    for (let i = 0; i < 60; i++) jeu.tour_suivant();
   }
+  const opt = [...document.getElementById("taille-damier").options].find((o) => o.value === `${jeu.largeur}x${jeu.hauteur}`);
+  if (opt) opt.selected = true;
   jeu.start();
 }
 const hot = window.claude?.hot;
