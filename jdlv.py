@@ -10,6 +10,7 @@ le lance avec la méthode start() :
     jeu.start()
 """
 
+import hashlib
 import random
 from array import array
 from operator import attrgetter
@@ -46,7 +47,8 @@ class Jdlv:
     # Nombre d'états retenus pour détecter les cycles. Un cycle plus long n'est
     # pas détecté. Exemple : sur un tore de 70 x 45, un planeur seul revient à
     # sa position de départ après 4 x ppcm(70, 45) = 2520 tours.
-    # Chaque état occupe largeur x hauteur octets (3 150 octets pour 70 x 45).
+    # On ne garde pas les états eux-mêmes (123 200 octets chacun pour 440 x 280,
+    # soit 370 Mo pour 3 000 états) mais leur empreinte de 16 octets.
     TAILLE_MEMOIRE = 3000
 
     def __init__(self, largeur=70, hauteur=50, torique=True, regle="B3/S23"):
@@ -315,13 +317,17 @@ class Jdlv:
     # Mémoire des états : retour arrière et détection des cycles
     # ------------------------------------------------------------------
     def signature(self):
-        """Résume l'état du tableau : une suite d'octets valant 0 ou 1.
+        """Résume l'état du tableau en une empreinte de 16 octets.
 
-        Deux tableaux identiques ont la même signature, qu'on peut utiliser
-        comme clé de dictionnaire. Elle n'est calculée qu'une fois par tour.
+        On écrit d'abord l'état complet (un octet 0 ou 1 par case), puis on
+        le passe dans une fonction de hachage (BLAKE2) : deux tableaux
+        identiques ont la même empreinte, et deux tableaux différents ont
+        une chance sur 2 puissance 128 d'avoir la même (en pratique jamais).
+        Elle n'est calculée qu'une fois par tour.
         """
         if self._signature is None:
-            self._signature = bytes(map(ETAT, self._toutes_les_cellules))
+            etat_complet = bytes(map(ETAT, self._toutes_les_cellules))
+            self._signature = hashlib.blake2b(etat_complet, digest_size=16).digest()
         return self._signature
 
     def _memoriser_etat_actuel(self):

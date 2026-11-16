@@ -222,6 +222,9 @@ Le résumé s'affiche dans le menu Aide › Matériel détecté.
   de changer et leurs voisines. Après 300 tours d'une soupe aléatoire de
   220 × 140, seules 4 % des cases changent encore : un tour passe de 20 ms à
   5 ms.
+- **Mémoire de la détection des cycles** : au lieu de garder 3 000 états
+  complets (370 Mo pour 440 × 280 !), on garde leur empreinte BLAKE2 de
+  16 octets (48 ko).
 - **`__slots__` dans `Cellule`** : chaque objet prend deux fois moins de
   mémoire et l'accès à ses attributs est plus rapide.
 - **Laisser travailler le C** : `bytes(map(attrgetter("Etat"), cellules))`
