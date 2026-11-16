@@ -897,11 +897,23 @@ class Jdlv_IHM {
 
   // ------------------------------------------------------------ affichage
   _preparer_image() {
-    this.image.width = this.jeu.largeur;
-    this.image.height = this.jeu.hauteur;
-    this.pixels = this.image_ctx.createImageData(this.jeu.largeur, this.jeu.hauteur);
-    this.pixels32 = new Uint32Array(this.pixels.data.buffer);
+    this._bloc_image = 0;     // l'image sera (re)créée au prochain dessin
     this._info_taille();
+  }
+  /* Image hors écran : 1 pixel = 1 case, ou, quand on dézoome (moins d'un
+     pixel par case), 1 pixel = un bloc de k × k cases, allumé si l'une d'elles
+     vit. Ainsi un planeur reste visible sur un damier de 2 000 × 2 000. */
+  _image_pour(k) {
+    if (k === this._bloc_image) return;
+    const l = Math.ceil(this.jeu.largeur / k), h = Math.ceil(this.jeu.hauteur / k);
+    this.image.width = l;
+    this.image.height = h;
+    this.pixels = this.image_ctx.createImageData(l, h);
+    this.pixels32 = new Uint32Array(this.pixels.data.buffer);
+    this._max_bloc = k > 1 ? new Uint8Array(l * h) : null;
+    this._colonne_bloc = new Uint32Array(this.jeu.largeur);
+    for (let x = 0; x < this.jeu.largeur; x++) this._colonne_bloc[x] = Math.floor(x / k);
+    this._bloc_image = k;
   }
   demander_dessin() {
     if (this._dessin_prevu) return;
@@ -911,10 +923,25 @@ class Jdlv_IHM {
   dessiner() {
     if (!this._taille_vue) return;
     const jeu = this.jeu;
-    // 1. Une case = un pixel de l'image hors écran
+    // 1. Image hors écran : une case = un pixel (ou un bloc de cases = un pixel)
     const palette = this.$("couleur-age").checked ? PALETTE_AGE : PALETTE_SIMPLE;
+    const k = this.zoom < 1 ? Math.ceil(1 / this.zoom) : 1;
+    this._image_pour(k);
     const p = this.pixels32, a = jeu.ages, n = jeu.largeur * jeu.hauteur;
-    for (let i = 0; i < n; i++) p[i] = palette[a[i]];
+    if (k === 1) {
+      for (let i = 0; i < n; i++) p[i] = palette[a[i]];
+    } else {
+      const bloc = this._max_bloc, col = this._colonne_bloc, l = this.image.width, W = jeu.largeur;
+      bloc.fill(0);
+      for (let y = 0; y < jeu.hauteur; y++) {
+        const base = Math.floor(y / k) * l, debut = y * W;
+        for (let x = 0; x < W; x++) {
+          const age = a[debut + x];
+          if (age > bloc[base + col[x]]) bloc[base + col[x]] = age;   // l'âge le plus grand du bloc
+        }
+      }
+      for (let j = 0; j < bloc.length; j++) p[j] = palette[bloc[j]];
+    }
     this.image_ctx.putImageData(this.pixels, 0, 0);
     // 2. On agrandit l'image à l'écran selon le zoom
     const ratio = window.devicePixelRatio || 1;
@@ -923,8 +950,8 @@ class Jdlv_IHM {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = COULEUR_HORS;
     ctx.fillRect(0, 0, l, h);
-    ctx.imageSmoothingEnabled = z < 1;
-    ctx.drawImage(this.image, this.ox, this.oy, jeu.largeur * z, jeu.hauteur * z);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.image, this.ox, this.oy, this.image.width * k * z, this.image.height * k * z);
     // 3. Quadrillage seulement quand les cases sont assez grandes
     if (z >= 6) {
       const x0 = Math.max(0, Math.floor(-this.ox / z)), x1 = Math.min(jeu.largeur, Math.ceil((l - this.ox) / z));
