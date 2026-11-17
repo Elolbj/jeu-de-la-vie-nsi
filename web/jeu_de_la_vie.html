@@ -444,6 +444,7 @@ class Jdlv {
     this.statut = EN_EVOLUTION;
     this.periode = null;
     this._signature = null;
+    this.version = 0;              // augmente à chaque changement : l'affichage sait s'il doit redessiner
   }
 
   est_dans_grille(x, y) { return x >= 0 && x < this.largeur && y >= 0 && y < this.hauteur; }
@@ -466,6 +467,7 @@ class Jdlv {
     this._apres_modification();
   }
   _apres_modification() {
+    this.version++;
     this._tout_recalculer = true;
     this.deja_vus = new Map();
     this.statut = EN_EVOLUTION;
@@ -601,6 +603,7 @@ class Jdlv {
     this._suivant = e;
     this._population = pop;
     this._signature = null;
+    this.version++;
     this.tour += 1;
     this.populations.push(pop);
     if (this.populations.length > 20000) this.populations.splice(0, 10000);
@@ -944,7 +947,9 @@ class Jdlv_IHM {
     const c = this.canevas;
     c.addEventListener("pointerdown", (e) => this._pointeur_bas(e));
     c.addEventListener("pointermove", (e) => this._pointeur_bouge(e));
-    for (const fin of ["pointerup", "pointercancel"]) c.addEventListener(fin, (e) => this._pointeur_haut(e));
+    c.addEventListener("pointerup", (e) => this._pointeur_haut(e));
+    // Geste interrompu par le système (appel, notification...) : on annule le trait en cours
+    c.addEventListener("pointercancel", (e) => { this._annuler_trait(); this.geste = null; this._pointeur_haut(e); this.demander_dessin(); });
     c.addEventListener("wheel", (e) => {
       e.preventDefault();
       const [px, py] = this._position(e);
@@ -1072,6 +1077,7 @@ class Jdlv_IHM {
      vit. Ainsi un planeur reste visible sur un damier de 2 000 × 2 000. */
   _image_pour(k) {
     if (k === this._bloc_image) return;
+    this._cle_image = null;
     const l = Math.ceil(this.jeu.largeur / k), h = Math.ceil(this.jeu.hauteur / k);
     this.image.width = l;
     this.image.height = h;
@@ -1094,8 +1100,13 @@ class Jdlv_IHM {
     const palette = this.$("couleur-age").checked ? PALETTE_AGE : PALETTE_SIMPLE;
     const k = this.zoom < 1 ? Math.ceil(1 / this.zoom) : 1;
     this._image_pour(k);
+    // Pendant un simple déplacement ou zoom, le damier n'a pas changé : on
+    // réutilise l'image déjà calculée (16 Mo à convertir pour 2 000 × 2 000).
+    const cle = `${jeu.version}|${k}|${palette === PALETTE_AGE}`;
     const p = this.pixels32, a = jeu.ages, n = jeu.largeur * jeu.hauteur;
-    if (k === 1) {
+    if (this._cle_image === cle && this._jeu_image === jeu) {
+      // rien à reconvertir
+    } else if (k === 1) {
       for (let i = 0; i < n; i++) p[i] = palette[a[i]];
     } else {
       const bloc = this._max_bloc, col = this._colonne_bloc, l = this.image.width, W = jeu.largeur;
@@ -1109,7 +1120,11 @@ class Jdlv_IHM {
       }
       for (let j = 0; j < bloc.length; j++) p[j] = palette[bloc[j]];
     }
-    this.image_ctx.putImageData(this.pixels, 0, 0);
+    if (this._cle_image !== cle || this._jeu_image !== jeu) {
+      this.image_ctx.putImageData(this.pixels, 0, 0);
+      this._cle_image = cle;
+      this._jeu_image = jeu;
+    }
     // 2. On agrandit l'image à l'écran selon le zoom
     const ratio = this.ratio;
     const [l, h] = this._taille_vue;
