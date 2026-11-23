@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "skills": {
+    "brainstorming": {
+      "source": "obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "sourceType": "github",
+      "skillPath": "skills/brainstorming/SKILL.md",
+      "computedHash": "a7424777b7f81e3eb9b4556d29fe233553736d8255780d3e1feea190fef61fef"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/docx/SKILL.md",
+      "computedHash": "20881307726dc87b9a1b0b2f9770ae869c2753081faedb5f89249d89a94e30a2"
+    },
+    "earnings-analysis": {
+      "source": "anthropics/financial-services",
+      "commit": "3e32c2287dcb637c184c01cc0ad82d6af7e9bb0f",
+      "sourceType": "github",
+      "skillPath": "plugins/vertical-plugins/equity-research/skills/earnings-analysis/SKILL.md",
+      "computedHash": "dc7ca8f16cffa671bb682c26dc6f01c580de8b747d02693409b0f08720d04c0a"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
+    },
+    "grill-me": {
+      "source": "mattpocock/skills",
+      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grill-me/SKILL.md",
+      "computedHash": "ab1acb9fbd9eaee03da254abb8a8de228d1e7a07475fe959da4a5eefa34ea4b9"
+    },
+    "image": {
+      "source": "coreyhaines31/marketingskills",
+      "commit": "5b2b400eec1e7e1cec76245a715d0b0d4fd2a9c1",
+      "sourceType": "github",
+      "skillPath": "skills/image/SKILL.md",
+      "computedHash": "97ffb6d97131e3278f7922ec79893e6fb67f2eb4c91fb7e5e77b0140a8373604"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "commit": "b49177d32788f2dc585c42831d845dacf1ebed2c",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "08bd5bf141cb507f46bd8347890cd985865606f15adf88295ed3a73bc9ad5d96"
+    },
+    "lark-base": {
+      "source": "larksuite/cli",
+      "commit": "c5fbf1a52df77d5cb9cac2b1501770b2fb9af7d2",
+      "sourceType": "github",
+      "skillPath": "skills/lark-base/SKILL.md",
+      "computedHash": "a92bfeca0654b3eb908bbe1639e13794d4c5c873249408c6bcf9f2c7a163d8d8"
+    },
+    "ppt-master": {
+      "source": "hugohe3/ppt-master",
+      "commit": "63a03673d5c3c928e7f52983a2c8ec65bac30002",
+      "sourceType": "github",
+      "skillPath": "skills/ppt-master/SKILL.md",
+      "computedHash": "9db36bb4637c2c5a531d6008c55116e349a7885a3726b9031287042674ca24f6"
+    },
+    "pptx": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/pptx/SKILL.md",
+      "computedHash": "e3c37c284de3a271a7e135d0cea5ead7cfaf002b83719d72e958963ccc5dd52f"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "7e935ad920b390035e0e139bce555d091d14c70b",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "d140f58b44b7dced02b0772db01f801990b4416a29410ef4ce1f48e266f62f99"
+    },
+    "writing-beats": {
+      "source": "mattpocock/skills",
+      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/writing-beats/SKILL.md",
+      "computedHash": "5af3ce4383f995c76a4780b3d3029af8e9c69aa1a44d57a6c8bc13a820836b8a"
+    }
+  }
+}
