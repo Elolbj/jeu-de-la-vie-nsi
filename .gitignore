@@ -6,3 +6,8 @@ graphify-out/cache/
 graphify-out/obsidian/
 graphify-out/manifest.json
 graphify-out/cost.json
+
+# Skills tiers installes avec `npx skills add` (restaurables via skills-lock.json :
+# npx -y skills experimental_install). Seul verifier-projet-jdlv est versionne.
+.claude/skills/*
+!.claude/skills/verifier-projet-jdlv/
